@@ -226,10 +226,17 @@ window.storage = {
       }
     });
 
-    await chrome.storage.sync.set({
-      [this.STORAGE_KEYS.FOLDERS]: folders,
-      [this.STORAGE_KEYS.ARTICLES]: articles
-    });
+    try {
+      await chrome.storage.sync.set({
+        [this.STORAGE_KEYS.FOLDERS]: folders,
+        [this.STORAGE_KEYS.ARTICLES]: articles
+      });
+    } catch (e) {
+      await chrome.storage.local.set({
+        [this.STORAGE_KEYS.FOLDERS]: folders,
+        [this.STORAGE_KEYS.ARTICLES]: articles
+      });
+    }
   },
 
   async getSettings() {

@@ -671,11 +671,16 @@
     if (!folder) return;
 
     if (confirm(`Delete folder "${folder.name}"? Articles in this folder will be moved to root.`)) {
-      await storage.deleteFolder(folderId);
-      allFolders = await storage.getFolders();
-      await loadData();
-      renderArticles();
-      showToast('Folder deleted', 'success');
+      try {
+        await storage.deleteFolder(folderId);
+        allFolders = await storage.getFolders();
+        await loadData();
+        renderArticles();
+        showToast('Folder deleted', 'success');
+      } catch (e) {
+        console.error('Failed to delete folder:', e);
+        showToast('Failed to delete folder', 'error');
+      }
     }
   }
 
