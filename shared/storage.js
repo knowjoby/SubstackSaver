@@ -274,7 +274,6 @@ window.storage = {
   async searchArticles(query, filters = {}) {
     const articles = await this.getArticles();
     const tags = await this.getTags();
-    const folders = await this.getFolders();
     
     const allProgress = await this.getAllProgressFromLocal();
     
@@ -292,8 +291,7 @@ window.storage = {
       const q = query.toLowerCase();
       results = results.filter(article => 
         (article.title || '').toLowerCase().includes(q) ||
-        (article.author || '').toLowerCase().includes(q) ||
-        (tags[article.tags[0]]?.name || '').toLowerCase().includes(q)
+        (article.author || '').toLowerCase().includes(q)
       );
     }
 
