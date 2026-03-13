@@ -6,16 +6,14 @@
   
   let currentArticle = null;
   let selectedTags = [];
-  let selectedFolder = null;
   let allTags = {};
-  let allFolders = {};
   let isSaving = false;
 
   async function init() {
     const settings = await storage.getSettings();
     utils.applyTheme(settings.theme || 'system');
     
-    await loadTagsAndFolders();
+    await loadTags();
     
     const tab = await utils.getActiveTab();
     
@@ -33,13 +31,12 @@
     document.getElementById('saveContent').style.display = 'none';
   }
 
-  async function loadTagsAndFolders() {
+  async function loadTags() {
     allTags = await storage.getTags();
-    allFolders = await storage.getFolders();
-    
     renderTagDropdown();
-    renderFolderDropdown();
   }
+
+  async function loadArticleInfo(tab) {
 
   async function loadArticleInfo(tab) {
     try {
@@ -103,7 +100,6 @@
       const existingArticle = await storage.getArticle(tab.url);
       if (existingArticle) {
         selectedTags = [...(existingArticle.tags || [])];
-        selectedFolder = existingArticle.folder;
         
         document.getElementById('saveBtn').innerHTML = `
           <span class="btn-text">✓ Saved</span>
@@ -146,26 +142,6 @@
     menu.innerHTML = html;
   }
 
-  function renderFolderDropdown() {
-    const menu = document.getElementById('folderDropdownMenu');
-    const folders = Object.values(allFolders).sort((a, b) => a.order - b.order);
-    
-    const html = `
-      <div class="folder-option ${!selectedFolder ? 'selected' : ''}" data-folder-id="">
-        <span>No folder</span>
-      </div>
-    ` + folders.map(folder => `
-      <div class="folder-option ${selectedFolder === folder.id ? 'selected' : ''}" data-folder-id="${utils.escapeHtml(folder.id)}">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-        </svg>
-        <span>${utils.escapeHtml(folder.name)}</span>
-      </div>
-    `).join('');
-
-    menu.innerHTML = html;
-  }
-
   function renderSelectedTags() {
     const container = document.getElementById('selectedTags');
     
@@ -186,41 +162,23 @@
     }).join('');
   }
 
-  function renderSelectedFolder() {
-    const folderText = selectedFolder && allFolders[selectedFolder] 
-      ? allFolders[selectedFolder].name 
-      : 'No folder';
-    document.getElementById('selectedFolder').textContent = folderText;
-  }
-
   function setupEventListeners() {
     const tagBtn = document.getElementById('tagDropdownBtn');
     const tagMenu = document.getElementById('tagDropdownMenu');
-    const folderBtn = document.getElementById('folderDropdownBtn');
-    const folderMenu = document.getElementById('folderDropdownMenu');
     const saveBtn = document.getElementById('saveBtn');
 
     tagBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       tagMenu.classList.toggle('open');
-      folderMenu.classList.remove('open');
-    });
-
-    folderBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      folderMenu.classList.toggle('open');
-      tagMenu.classList.remove('open');
     });
 
     document.addEventListener('click', () => {
       tagMenu.classList.remove('open');
-      folderMenu.classList.remove('open');
     });
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         tagMenu.classList.remove('open');
-        folderMenu.classList.remove('open');
       }
     });
 
@@ -235,17 +193,14 @@
         saveBtn.classList.remove('saved');
         saveBtn.innerHTML = '<span class="btn-text">Save to Reading List</span>';
         selectedTags = [];
-        selectedFolder = null;
         renderSelectedTags();
-        renderSelectedFolder();
       } else {
         saveBtn.classList.add('loading');
         
         try {
           await storage.saveArticle({
             ...currentArticle,
-            tags: selectedTags,
-            folder: selectedFolder
+            tags: selectedTags
           });
           
           saveBtn.classList.remove('loading');
@@ -279,15 +234,6 @@
 
       const newTagInput = e.target.closest('#newTagInput');
       if (newTagInput) return;
-    });
-
-    folderMenu.addEventListener('click', (e) => {
-      const folderOption = e.target.closest('.folder-option');
-      if (folderOption) {
-        selectedFolder = folderOption.dataset.folderId || null;
-        renderFolderDropdown();
-        renderSelectedFolder();
-      }
     });
 
     const newTagInput = document.getElementById('newTagInput');

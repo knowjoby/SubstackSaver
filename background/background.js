@@ -11,11 +11,7 @@ const DEFAULT_TAGS = [
   { id: 'important', name: 'Important', color: '#D13438' }
 ];
 
-const DEFAULT_FOLDERS = [
-  { id: 'reading-now', name: 'Reading Now', order: 0 },
-  { id: 'archive', name: 'Archive', order: 1 },
-  { id: 'favorites', name: 'Favorites', order: 2 }
-];
+const DEFAULT_FOLDERS = [];
 
 const DEFAULT_SETTINGS = {
   theme: 'system',
