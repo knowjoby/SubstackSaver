@@ -80,8 +80,12 @@ window.utils = {
   },
 
   async getActiveTab() {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    return tab;
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      return tab;
+    } catch (e) {
+      return null;
+    }
   },
 
   async getTheme() {

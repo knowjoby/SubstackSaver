@@ -78,7 +78,7 @@
         setTimeout(() => {
           scrollToProgress(progress);
           
-          const cleanUrl = window.location.href.replace(/[?&]progress=\d+/, '').replace(/[?&]from=substacksaver/, '');
+          const cleanUrl = window.location.href.replace(/[?&]progress=\d+/g, '').replace(/[?&]from=substacksaver/g, '');
           window.history.replaceState({}, document.title, cleanUrl);
         }, 500);
       }
@@ -92,7 +92,12 @@
   }
 
   function init() {
-    if (!window.location.href.includes('substack.com')) {
+    try {
+      const hostname = window.location.hostname;
+      if (!hostname.endsWith('substack.com') && !hostname.endsWith('substack.email')) {
+        return;
+      }
+    } catch (e) {
       return;
     }
 

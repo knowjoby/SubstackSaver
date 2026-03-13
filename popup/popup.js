@@ -164,8 +164,8 @@
       if (!tag) return '';
       return `
         <span class="tag-chip">
-          <span class="tag-dot" style="background: ${tag.color}"></span>
-          ${tag.name}
+          <span class="tag-dot" style="background: ${utils.escapeHtml(tag.color)}"></span>
+          ${utils.escapeHtml(tag.name)}
         </span>
       `;
     }).join('');
