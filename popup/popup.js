@@ -3,7 +3,7 @@
   var isSaving = false;
 
   function init() {
-    storage.getSettings().then(function(settings) {
+    storage.getSettings(function(settings) {
       utils.applyTheme(settings.theme || 'system');
     });
     
@@ -12,7 +12,7 @@
         showNotSubstack();
         return;
       }
-      loadArticleInfo(tab).then(function() {
+      loadArticleInfo(tab, function() {
         setupEventListeners();
       });
     });
@@ -23,75 +23,80 @@
     document.getElementById('saveContent').style.display = 'none';
   }
 
-  function loadArticleInfo(tab) {
-    return new Promise(function(resolve, reject) {
-      chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        function: function() {
-          var getMeta = function(prop) {
-            var el = document.querySelector('meta[property="' + prop + '"]');
-            if (el) return el.content;
-            el = document.querySelector('meta[name="' + prop + '"]');
-            return el ? el.content : null;
-          };
-          
-          var ogTitle = getMeta('og:title') || document.title;
-          var ogImage = getMeta('og:image');
-          var author = '';
-          var authorEl = document.querySelector('meta[name="author"]');
-          if (authorEl) author = authorEl.content;
-          if (!author) {
-            var authorLink = document.querySelector('a[href*="/@"]');
-            if (authorLink) author = authorLink.textContent.trim();
-          }
-          
-          return {
-            title: ogTitle || '',
-            author: author ? author.replace(/^by\s+/i, '') : '',
-            thumbnail: ogImage || ''
-          };
+  function loadArticleInfo(tab, callback) {
+    chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      function: function() {
+        var getMeta = function(prop) {
+          var el = document.querySelector('meta[property="' + prop + '"]');
+          if (el) return el.content;
+          el = document.querySelector('meta[name="' + prop + '"]');
+          return el ? el.content : null;
+        };
+        
+        var ogTitle = getMeta('og:title') || document.title;
+        var ogImage = getMeta('og:image');
+        var author = '';
+        var authorEl = document.querySelector('meta[name="author"]');
+        if (authorEl) author = authorEl.content;
+        if (!author) {
+          var authorLink = document.querySelector('a[href*="/@"]');
+          if (authorLink) author = authorLink.textContent ? authorLink.textContent.trim() : '';
         }
-      }, function(results) {
-        try {
-          var info = results && results[0] && results[0].result ? results[0].result : { title: tab.title, author: '', thumbnail: '' };
-          
-          currentArticle = {
-            url: tab.url,
-            title: info.title || tab.title,
-            author: info.author || '',
-            thumbnail: info.thumbnail || ''
-          };
+        
+        return {
+          title: ogTitle || '',
+          author: author ? author.replace(/^by\s+/i, '') : '',
+          thumbnail: ogImage || ''
+        };
+      }
+    }, function(results, error) {
+      if (error) {
+        console.error('Script execution error:', error);
+        document.getElementById('articleTitle').textContent = tab.title;
+        if (callback) callback();
+        return;
+      }
+      
+      try {
+        var info = results && results[0] && results[0].result ? results[0].result : { title: tab.title, author: '', thumbnail: '' };
+        
+        currentArticle = {
+          url: tab.url,
+          title: info.title || tab.title,
+          author: info.author || '',
+          thumbnail: info.thumbnail || ''
+        };
 
-          document.getElementById('articleTitle').textContent = currentArticle.title;
-          document.getElementById('articleAuthor').textContent = currentArticle.author;
-          
-          var thumb = document.getElementById('thumbnail');
-          if (info.thumbnail) {
-            thumb.src = info.thumbnail;
-            thumb.style.display = 'block';
-          } else {
-            thumb.style.display = 'none';
-          }
+        document.getElementById('articleTitle').textContent = currentArticle.title;
+        document.getElementById('articleAuthor').textContent = currentArticle.author;
+        
+        var thumb = document.getElementById('thumbnail');
+        if (info.thumbnail) {
+          thumb.src = info.thumbnail;
+          thumb.style.display = 'block';
+        } else {
+          thumb.style.display = 'none';
+        }
 
-          storage.getArticle(tab.url).then(function(existingArticle) {
-            if (existingArticle) {
-              document.getElementById('saveBtn').innerHTML = '<span class="btn-text">✓ Saved</span>';
-              document.getElementById('saveBtn').classList.add('saved');
-              
-              if (existingArticle.progress > 0) {
-                document.getElementById('progressSection').style.display = 'block';
-                document.getElementById('progressText').textContent = existingArticle.progress + '%';
-                document.getElementById('progressFill').style.width = existingArticle.progress + '%';
-              }
+        storage.getArticle(tab.url, function(existingArticle) {
+          if (existingArticle) {
+            document.getElementById('saveBtn').innerHTML = '<span class="btn-text">✓ Saved</span>';
+            document.getElementById('saveBtn').classList.add('saved');
+            
+            if (existingArticle.progress > 0) {
+              document.getElementById('progressSection').style.display = 'block';
+              document.getElementById('progressText').textContent = existingArticle.progress + '%';
+              document.getElementById('progressFill').style.width = existingArticle.progress + '%';
             }
-            resolve();
-          });
-        } catch (e) {
-          console.error('Error loading article info:', e);
-          document.getElementById('articleTitle').textContent = tab.title;
-          resolve();
-        }
-      });
+          }
+          if (callback) callback();
+        });
+      } catch (e) {
+        console.error('Error loading article info:', e);
+        document.getElementById('articleTitle').textContent = tab.title;
+        if (callback) callback();
+      }
     });
   }
 
@@ -105,7 +110,7 @@
       var isSaved = saveBtn.classList.contains('saved');
       
       if (isSaved) {
-        storage.deleteArticle(currentArticle.url).then(function() {
+        storage.deleteArticle(currentArticle.url, function() {
           saveBtn.classList.remove('saved');
           saveBtn.innerHTML = '<span class="btn-text">Save to Reading List</span>';
           isSaving = false;
@@ -118,14 +123,10 @@
           title: currentArticle.title,
           author: currentArticle.author,
           thumbnail: currentArticle.thumbnail
-        }).then(function() {
+        }, function() {
           saveBtn.classList.remove('loading');
           saveBtn.classList.add('saved');
           saveBtn.innerHTML = '<span class="btn-text">✓ Saved</span>';
-          isSaving = false;
-        }).catch(function(e) {
-          saveBtn.classList.remove('loading');
-          console.error('Failed to save:', e);
           isSaving = false;
         });
       }

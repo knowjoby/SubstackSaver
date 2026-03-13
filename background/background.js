@@ -1,19 +1,19 @@
-const STORAGE_KEYS = {
+var STORAGE_KEYS = {
   ARTICLES: 'articles',
   TAGS: 'tags',
   FOLDERS: 'folders',
   SETTINGS: 'settings'
 };
 
-const DEFAULT_TAGS = [
+var DEFAULT_TAGS = [
   { id: 'read', name: 'Read', color: '#107C10' },
   { id: 'later', name: 'Read Later', color: '#0078D4' },
   { id: 'important', name: 'Important', color: '#D13438' }
 ];
 
-const DEFAULT_FOLDERS = [];
+var DEFAULT_FOLDERS = [];
 
-const DEFAULT_SETTINGS = {
+var DEFAULT_SETTINGS = {
   theme: 'system',
   defaultView: 'grid',
   showProgress: true
@@ -24,9 +24,9 @@ function generateId() {
 }
 
 function hashCode(str) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
+  var hash = 0;
+  for (var i = 0; i < str.length; i++) {
+    var char = str.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
     hash = hash & hash;
   }
@@ -43,107 +43,125 @@ function isSubstackUrl(url) {
   }
 }
 
-async function saveArticle(article) {
-  const id = hashCode(article.url);
+function saveArticle(article, callback) {
+  var id = hashCode(article.url);
   
-  let articles = {};
-  try {
-    const result = await chrome.storage.sync.get(STORAGE_KEYS.ARTICLES);
-    articles = result[STORAGE_KEYS.ARTICLES] || {};
-  } catch (e) {
-    const localResult = await chrome.storage.local.get(STORAGE_KEYS.ARTICLES);
-    articles = localResult[STORAGE_KEYS.ARTICLES] || {};
-  }
-  
-  articles[id] = {
-    id,
-    url: article.url,
-    title: article.title,
-    author: article.author || '',
-    thumbnail: article.thumbnail || '',
-    savedAt: Date.now(),
-    progress: article.progress || 0,
-    tags: article.tags || [],
-    folder: article.folder || null,
-    notes: article.notes || '',
-    isFavorite: article.isFavorite || false
-  };
+  chrome.storage.sync.get(STORAGE_KEYS.ARTICLES, function(result) {
+    var articles = {};
+    if (!chrome.runtime.lastError && result[STORAGE_KEYS.ARTICLES]) {
+      articles = result[STORAGE_KEYS.ARTICLES];
+    }
+    
+    articles[id] = {
+      id: id,
+      url: article.url,
+      title: article.title,
+      author: article.author || '',
+      thumbnail: article.thumbnail || '',
+      savedAt: Date.now(),
+      progress: article.progress || 0,
+      tags: article.tags || [],
+      folder: article.folder || null,
+      notes: article.notes || '',
+      isFavorite: article.isFavorite || false
+    };
 
-  try {
-    await chrome.storage.sync.set({ [STORAGE_KEYS.ARTICLES]: articles });
-  } catch (e) {
-    await chrome.storage.local.set({ [STORAGE_KEYS.ARTICLES]: articles });
-  }
-  
-  return articles[id];
+    var data = {};
+    data[STORAGE_KEYS.ARTICLES] = articles;
+    
+    chrome.storage.sync.set(data, function() {
+      if (chrome.runtime.lastError) {
+        chrome.storage.local.set(data, function() {
+          if (callback) callback(articles[id]);
+        });
+      } else {
+        if (callback) callback(articles[id]);
+      }
+    });
+  });
 }
 
-async function deleteArticle(url) {
-  const id = hashCode(url);
+function deleteArticle(url, callback) {
+  var id = hashCode(url);
   
-  let articles = {};
-  try {
-    const result = await chrome.storage.sync.get(STORAGE_KEYS.ARTICLES);
-    articles = result[STORAGE_KEYS.ARTICLES] || {};
-  } catch (e) {
-    const localResult = await chrome.storage.local.get(STORAGE_KEYS.ARTICLES);
-    articles = localResult[STORAGE_KEYS.ARTICLES] || {};
-  }
-  
-  delete articles[id];
+  chrome.storage.sync.get(STORAGE_KEYS.ARTICLES, function(result) {
+    var articles = {};
+    if (!chrome.runtime.lastError && result[STORAGE_KEYS.ARTICLES]) {
+      articles = result[STORAGE_KEYS.ARTICLES];
+    }
+    
+    delete articles[id];
 
-  try {
-    await chrome.storage.sync.set({ [STORAGE_KEYS.ARTICLES]: articles });
-  } catch (e) {
-    await chrome.storage.local.set({ [STORAGE_KEYS.ARTICLES]: articles });
-  }
+    var data = {};
+    data[STORAGE_KEYS.ARTICLES] = articles;
+    
+    chrome.storage.sync.set(data, function() {
+      if (chrome.runtime.lastError) {
+        chrome.storage.local.set(data, function() {
+          if (callback) callback();
+        });
+      } else {
+        if (callback) callback();
+      }
+    });
+  });
 }
 
-async function isArticleSaved(url) {
-  const id = hashCode(url);
+function isArticleSaved(url, callback) {
+  var id = hashCode(url);
   
-  try {
-    const result = await chrome.storage.sync.get(STORAGE_KEYS.ARTICLES);
-    return !!(result[STORAGE_KEYS.ARTICLES] || {})[id];
-  } catch (e) {
-    const localResult = await chrome.storage.local.get(STORAGE_KEYS.ARTICLES);
-    return !!((localResult[STORAGE_KEYS.ARTICLES] || {})[id]);
-  }
+  chrome.storage.sync.get(STORAGE_KEYS.ARTICLES, function(result) {
+    var articles = {};
+    if (!chrome.runtime.lastError && result[STORAGE_KEYS.ARTICLES]) {
+      articles = result[STORAGE_KEYS.ARTICLES];
+    }
+    callback(!!articles[id]);
+  });
 }
 
-async function initializeStorage() {
-  try {
-    const tagsResult = await chrome.storage.sync.get(STORAGE_KEYS.TAGS);
-    let tags = tagsResult[STORAGE_KEYS.TAGS] || {};
+function initializeStorage() {
+  chrome.storage.sync.get(STORAGE_KEYS.TAGS, function(result) {
+    if (chrome.runtime.lastError) {
+      console.log('SubstackSaver: Using local storage');
+      return;
+    }
+    
+    var tags = result[STORAGE_KEYS.TAGS] || {};
     
     if (Object.keys(tags).length === 0) {
-      tags = DEFAULT_TAGS.reduce((acc, tag) => {
-        acc[tag.id] = tag;
-        return acc;
-      }, {});
-      await chrome.storage.sync.set({ [STORAGE_KEYS.TAGS]: tags });
+      tags = {};
+      DEFAULT_TAGS.forEach(function(tag) {
+        tags[tag.id] = tag;
+      });
+      var data = {};
+      data[STORAGE_KEYS.TAGS] = tags;
+      chrome.storage.sync.set(data, function() {});
     }
 
-    const foldersResult = await chrome.storage.sync.get(STORAGE_KEYS.FOLDERS);
-    let folders = foldersResult[STORAGE_KEYS.FOLDERS] || {};
-    
-    if (Object.keys(folders).length === 0) {
-      folders = DEFAULT_FOLDERS.reduce((acc, folder) => {
-        acc[folder.id] = folder;
-        return acc;
-      }, {});
-      await chrome.storage.sync.set({ [STORAGE_KEYS.FOLDERS]: folders });
-    }
+    chrome.storage.sync.get(STORAGE_KEYS.FOLDERS, function(foldersResult) {
+      var folders = foldersResult[STORAGE_KEYS.FOLDERS] || {};
+      
+      if (Object.keys(folders).length === 0) {
+        folders = {};
+        DEFAULT_FOLDERS.forEach(function(folder) {
+          folders[folder.id] = folder;
+        });
+        var data = {};
+        data[STORAGE_KEYS.FOLDERS] = folders;
+        chrome.storage.sync.set(data, function() {});
+      }
 
-    const settingsResult = await chrome.storage.sync.get(STORAGE_KEYS.SETTINGS);
-    let settings = settingsResult[STORAGE_KEYS.SETTINGS] || {};
-    
-    if (Object.keys(settings).length === 0) {
-      await chrome.storage.sync.set({ [STORAGE_KEYS.SETTINGS]: DEFAULT_SETTINGS });
-    }
-  } catch (e) {
-    console.log('SubstackSaver: Using local storage');
-  }
+      chrome.storage.sync.get(STORAGE_KEYS.SETTINGS, function(settingsResult) {
+        var settings = settingsResult[STORAGE_KEYS.SETTINGS] || {};
+        
+        if (Object.keys(settings).length === 0) {
+          var data = {};
+          data[STORAGE_KEYS.SETTINGS] = DEFAULT_SETTINGS;
+          chrome.storage.sync.set(data, function() {});
+        }
+      });
+    });
+  });
 }
 
 function createContextMenus() {
@@ -213,7 +231,12 @@ if (chrome.contextMenus && chrome.contextMenus.onClicked) {
             thumbnail: ogImage || ''
           };
         }
-      }, function(results) {
+      }, function(results, error) {
+        if (error) {
+          console.error('Script execution error:', error);
+          return;
+        }
+        
         var pageInfo = results && results[0] && results[0].result ? results[0].result : { title: tab.title, author: '', thumbnail: '' };
         
         saveArticle({
@@ -221,9 +244,11 @@ if (chrome.contextMenus && chrome.contextMenus.onClicked) {
           title: pageInfo.title || tab.title,
           author: pageInfo.author || '',
           thumbnail: pageInfo.thumbnail || ''
+        }, function() {
+          if (tab.id) {
+            chrome.tabs.sendMessage(tab.id, { action: 'saved' });
+          }
         });
-
-        chrome.tabs.sendMessage(tab.id, { action: 'saved' });
       });
     }
 
@@ -235,7 +260,7 @@ if (chrome.contextMenus && chrome.contextMenus.onClicked) {
         title: linkUrl.split('/').pop() || 'Substack Article',
         author: '',
         thumbnail: ''
-      });
+      }, function() {});
     }
   });
 }

@@ -44,378 +44,570 @@ window.storage = {
     showProgress: true
   },
 
-  async getStorage() {
-    try {
-      const result = await chrome.storage.sync.get(null);
-      return result;
-    } catch (e) {
-      return await chrome.storage.local.get(null);
-    }
-  },
-
-  async saveArticle(article) {
-    var id = this.hashCode(article.url);
-    const articles = await this.getArticles();
-    
-    articles[id] = {
-      id,
-      url: article.url,
-      title: this.sanitizeInput(article.title),
-      author: this.sanitizeInput(article.author || ''),
-      thumbnail: article.thumbnail || '',
-      excerpt: this.sanitizeInput(article.excerpt || ''),
-      savedAt: Date.now(),
-      progress: article.progress || 0,
-      tags: article.tags || [],
-      folder: article.folder || null,
-      notes: this.sanitizeInput(article.notes || ''),
-      isFavorite: article.isFavorite || false
-    };
-
-    try {
-      await chrome.storage.sync.set({ [this.STORAGE_KEYS.ARTICLES]: articles });
-    } catch (e) {
-      await chrome.storage.local.set({ [this.STORAGE_KEYS.ARTICLES]: articles });
-    }
-    return articles[id];
-  },
-
-  async getArticles() {
-    try {
-      const result = await chrome.storage.sync.get(this.STORAGE_KEYS.ARTICLES);
-      return result[this.STORAGE_KEYS.ARTICLES] || {};
-    } catch (e) {
-      const result = await chrome.storage.local.get(this.STORAGE_KEYS.ARTICLES);
-      return result[this.STORAGE_KEYS.ARTICLES] || {};
-    }
-  },
-
-  async getArticle(url) {
-    const articles = await this.getArticles();
-    const id = this.hashCode(url);
-    return articles[id] || null;
-  },
-
-  async updateArticleProgress(url, progress) {
-    const articles = await this.getArticles();
-    const id = this.hashCode(url);
-    if (articles[id]) {
-      articles[id].progress = Math.min(100, Math.max(0, progress));
-      try {
-        await chrome.storage.sync.set({ [this.STORAGE_KEYS.ARTICLES]: articles });
-      } catch (e) {
-        await chrome.storage.local.set({ [this.STORAGE_KEYS.ARTICLES]: articles });
-      }
-    }
-    return articles[id];
-  },
-
-  async deleteArticle(url) {
-    const articles = await this.getArticles();
-    const id = this.hashCode(url);
-    delete articles[id];
-    try {
-      await chrome.storage.sync.set({ [this.STORAGE_KEYS.ARTICLES]: articles });
-    } catch (e) {
-      await chrome.storage.local.set({ [this.STORAGE_KEYS.ARTICLES]: articles });
-    }
-  },
-
-  async isArticleSaved(url) {
-    const article = await this.getArticle(url);
-    return !!article;
-  },
-
-  async getTags() {
-    try {
-      const result = await chrome.storage.sync.get(this.STORAGE_KEYS.TAGS);
-      let tags = result[this.STORAGE_KEYS.TAGS] || {};
-      
-      if (Object.keys(tags).length === 0) {
-        tags = this.DEFAULT_TAGS.reduce((acc, tag) => {
-          acc[tag.id] = tag;
-          return acc;
-        }, {});
-        try {
-          await chrome.storage.sync.set({ [this.STORAGE_KEYS.TAGS]: tags });
-        } catch (e) {
-          await chrome.storage.local.set({ [this.STORAGE_KEYS.TAGS]: tags });
-        }
-      }
-      
-      return tags;
-    } catch (e) {
-      const result = await chrome.storage.local.get(this.STORAGE_KEYS.TAGS);
-      return result[this.STORAGE_KEYS.TAGS] || this.DEFAULT_TAGS.reduce((acc, tag) => {
-        acc[tag.id] = tag;
-        return acc;
-      }, {});
-    }
-  },
-
-  async createTag(name, color) {
-    const tags = await this.getTags();
-    const id = this.generateId();
-    tags[id] = { id, name, color };
-    try {
-      await chrome.storage.sync.set({ [this.STORAGE_KEYS.TAGS]: tags });
-    } catch (e) {
-      await chrome.storage.local.set({ [this.STORAGE_KEYS.TAGS]: tags });
-    }
-    return tags[id];
-  },
-
-  async deleteTag(tagId) {
-    const tags = await this.getTags();
-    const articles = await this.getArticles();
-    
-    delete tags[tagId];
-    
-    Object.values(articles).forEach(article => {
-      article.tags = article.tags.filter(t => t !== tagId);
-    });
-
-    try {
-      await chrome.storage.sync.set({
-        [this.STORAGE_KEYS.TAGS]: tags,
-        [this.STORAGE_KEYS.ARTICLES]: articles
-      });
-    } catch (e) {
-      await chrome.storage.local.set({
-        [this.STORAGE_KEYS.TAGS]: tags,
-        [this.STORAGE_KEYS.ARTICLES]: articles
-      });
-    }
-  },
-
-  async getFolders() {
-    try {
-      const result = await chrome.storage.sync.get(this.STORAGE_KEYS.FOLDERS);
-      let folders = result[this.STORAGE_KEYS.FOLDERS] || {};
-      
-      if (Object.keys(folders).length === 0) {
-        folders = this.DEFAULT_FOLDERS.reduce((acc, folder) => {
-          acc[folder.id] = folder;
-          return acc;
-        }, {});
-        try {
-          await chrome.storage.sync.set({ [this.STORAGE_KEYS.FOLDERS]: folders });
-        } catch (e) {
-          await chrome.storage.local.set({ [this.STORAGE_KEYS.FOLDERS]: folders });
-        }
-      }
-      
-      return folders;
-    } catch (e) {
-      const result = await chrome.storage.local.get(this.STORAGE_KEYS.FOLDERS);
-      return result[this.STORAGE_KEYS.FOLDERS] || this.DEFAULT_FOLDERS.reduce((acc, folder) => {
-        acc[folder.id] = folder;
-        return acc;
-      }, {});
-    }
-  },
-
-  async createFolder(name) {
-    const folders = await this.getFolders();
-    const id = this.generateId();
-    const order = Object.keys(folders).length;
-    folders[id] = { id, name, order };
-    await chrome.storage.sync.set({ [this.STORAGE_KEYS.FOLDERS]: folders });
-    return folders[id];
-  },
-
-  async deleteFolder(folderId) {
-    const folders = await this.getFolders();
-    const articles = await this.getArticles();
-    
-    delete folders[folderId];
-    
-    Object.values(articles).forEach(article => {
-      if (article.folder === folderId) {
-        article.folder = null;
-      }
-    });
-
-    try {
-      await chrome.storage.sync.set({
-        [this.STORAGE_KEYS.FOLDERS]: folders,
-        [this.STORAGE_KEYS.ARTICLES]: articles
-      });
-    } catch (e) {
-      await chrome.storage.local.set({
-        [this.STORAGE_KEYS.FOLDERS]: folders,
-        [this.STORAGE_KEYS.ARTICLES]: articles
-      });
-    }
-  },
-
-  async getSettings() {
-    try {
-      const result = await chrome.storage.sync.get(this.STORAGE_KEYS.SETTINGS);
-      return { ...this.DEFAULT_SETTINGS, ...result[this.STORAGE_KEYS.SETTINGS] };
-    } catch (e) {
-      const result = await chrome.storage.local.get(this.STORAGE_KEYS.SETTINGS);
-      return { ...this.DEFAULT_SETTINGS, ...result[this.STORAGE_KEYS.SETTINGS] };
-    }
-  },
-
-  async updateSettings(settings) {
-    const current = await this.getSettings();
-    const updated = { ...current, ...settings };
-    try {
-      await chrome.storage.sync.set({ [this.STORAGE_KEYS.SETTINGS]: updated });
-    } catch (e) {
-      await chrome.storage.local.set({ [this.STORAGE_KEYS.SETTINGS]: updated });
-    }
-    return updated;
-  },
-
-  async getAllProgressFromLocal() {
-    try {
-      const all = await chrome.storage.local.get(null);
-      const progressData = {};
-      for (const [key, value] of Object.entries(all)) {
-        if (key.startsWith('substacksaver_progress_')) {
-          progressData[key.replace('substacksaver_progress_', '')] = value.progress;
-        }
-      }
-      return progressData;
-    } catch (e) {
-      return {};
-    }
-  },
-
-  async searchArticles(query, filters = {}) {
-    const articles = await this.getArticles();
-    const tags = await this.getTags();
-    
-    const allProgress = await this.getAllProgressFromLocal();
-    
-    let results = Object.values(articles);
-    
-    for (let article of results) {
-    const id = this.hashCode(article.url);
-      const localProgress = allProgress[id] || 0;
-      if (localProgress > article.progress) {
-        article.progress = localProgress;
-      }
-    }
-    
-    if (query) {
-      const q = query.toLowerCase();
-      results = results.filter(article => 
-        (article.title || '').toLowerCase().includes(q) ||
-        (article.author || '').toLowerCase().includes(q)
-      );
-    }
-
-    if (filters.status) {
-      if (filters.status === 'unread') {
-        results = results.filter(a => a.progress === 0);
-      } else if (filters.status === 'in-progress') {
-        results = results.filter(a => a.progress > 0 && a.progress < 100);
-      } else if (filters.status === 'completed') {
-        results = results.filter(a => a.progress >= 100);
-      }
-    }
-
-    if (filters.tags && filters.tags.length > 0) {
-      results = results.filter(a => 
-        a.tags.some(t => filters.tags.includes(t))
-      );
-    }
-
-    if (filters.folder) {
-      results = results.filter(a => a.folder === filters.folder);
-    }
-
-    if (filters.favorites) {
-      results = results.filter(a => a.isFavorite);
-    }
-
-    const sortBy = filters.sortBy || 'savedAt';
-    const sortOrder = filters.sortOrder || 'desc';
-    
-    results.sort((a, b) => {
-      let comparison = 0;
-      if (sortBy === 'title') {
-        comparison = a.title.localeCompare(b.title);
-      } else if (sortBy === 'progress') {
-        comparison = a.progress - b.progress;
+  getStorage: function(callback) {
+    var self = this;
+    chrome.storage.sync.get(null, function(result) {
+      if (chrome.runtime.lastError) {
+        chrome.storage.local.get(null, function(localResult) {
+          callback(localResult || {});
+        });
       } else {
-        comparison = a.savedAt - b.savedAt;
+        callback(result || {});
       }
-      return sortOrder === 'desc' ? -comparison : comparison;
     });
-
-    return results;
   },
 
-  async exportToEdgeCollections() {
-    const articles = await this.getArticles();
-    const tags = await this.getTags();
+  saveArticle: function(article, callback) {
+    var self = this;
+    var id = this.hashCode(article.url);
     
-    const collection = {
-      name: "SubstackSaver Export",
-      items: Object.values(articles).map(article => ({
-        title: article.title,
+    this.getArticles(function(articles) {
+      articles[id] = {
+        id: id,
         url: article.url,
-        notes: article.notes || '',
-        tags: article.tags.map(t => tags[t]?.name || '').filter(Boolean)
-      }))
-    };
+        title: self.sanitizeInput(article.title),
+        author: self.sanitizeInput(article.author || ''),
+        thumbnail: article.thumbnail || '',
+        excerpt: self.sanitizeInput(article.excerpt || ''),
+        savedAt: Date.now(),
+        progress: article.progress || 0,
+        tags: article.tags || [],
+        folder: article.folder || null,
+        notes: self.sanitizeInput(article.notes || ''),
+        isFavorite: article.isFavorite || false
+      };
 
-    return collection;
+      var data = {};
+      data[self.STORAGE_KEYS.ARTICLES] = articles;
+      
+      chrome.storage.sync.set(data, function() {
+        if (chrome.runtime.lastError) {
+          chrome.storage.local.set(data, function() {
+            if (callback) callback(articles[id]);
+          });
+        } else {
+          if (callback) callback(articles[id]);
+        }
+      });
+    });
   },
 
-  async importFromEdgeCollections(collectionData) {
-    if (!collectionData || typeof collectionData !== 'object') {
-      throw new Error('Invalid import data');
-    }
-    
-    const items = Array.isArray(collectionData.items) ? collectionData.items : [];
-    const articles = await this.getArticles();
-    const tags = await this.getTags();
-    
-    for (const item of items) {
-      if (!item || typeof item !== 'object' || !item.url) {
-        continue;
+  getArticles: function(callback) {
+    var self = this;
+    chrome.storage.sync.get(this.STORAGE_KEYS.ARTICLES, function(result) {
+      if (chrome.runtime.lastError) {
+        chrome.storage.local.get(self.STORAGE_KEYS.ARTICLES, function(localResult) {
+          callback(localResult[self.STORAGE_KEYS.ARTICLES] || {});
+        });
+      } else {
+        callback(result[self.STORAGE_KEYS.ARTICLES] || {});
       }
-      
-      var id = this.hashCode(item.url);
-      
-      let articleTags = [];
-      if (Array.isArray(item.tags)) {
-        for (const tagName of item.tags) {
-          if (typeof tagName !== 'string') continue;
-          const normalizedName = tagName.toLowerCase();
-          const existingTag = Object.values(tags).find(t => t.name.toLowerCase() === normalizedName);
-          if (existingTag) {
-            articleTags.push(existingTag.id);
+    });
+  },
+
+  getArticle: function(url, callback) {
+    var self = this;
+    this.getArticles(function(articles) {
+      var id = self.hashCode(url);
+      callback(articles[id] || null);
+    });
+  },
+
+  updateArticleProgress: function(url, progress, callback) {
+    var self = this;
+    this.getArticles(function(articles) {
+      var id = self.hashCode(url);
+      if (articles[id]) {
+        articles[id].progress = Math.min(100, Math.max(0, progress));
+        
+        var data = {};
+        data[self.STORAGE_KEYS.ARTICLES] = articles;
+        
+        chrome.storage.sync.set(data, function() {
+          if (chrome.runtime.lastError) {
+            chrome.storage.local.set(data, function() {
+              if (callback) callback(articles[id]);
+            });
+          } else {
+            if (callback) callback(articles[id]);
           }
+        });
+      } else {
+        if (callback) callback(null);
+      }
+    });
+  },
+
+  deleteArticle: function(url, callback) {
+    var self = this;
+    this.getArticles(function(articles) {
+      var id = self.hashCode(url);
+      delete articles[id];
+      
+      var data = {};
+      data[self.STORAGE_KEYS.ARTICLES] = articles;
+      
+      chrome.storage.sync.set(data, function() {
+        if (chrome.runtime.lastError) {
+          chrome.storage.local.set(data, function() {
+            if (callback) callback();
+          });
+        } else {
+          if (callback) callback();
+        }
+      });
+    });
+  },
+
+  isArticleSaved: function(url, callback) {
+    var self = this;
+    this.getArticle(url, function(article) {
+      callback(!!article);
+    });
+  },
+
+  getTags: function(callback) {
+    var self = this;
+    chrome.storage.sync.get(this.STORAGE_KEYS.TAGS, function(result) {
+      if (chrome.runtime.lastError) {
+        chrome.storage.local.get(self.STORAGE_KEYS.TAGS, function(localResult) {
+          var tags = localResult[self.STORAGE_KEYS.TAGS] || {};
+          if (Object.keys(tags).length === 0) {
+            tags = {};
+            self.DEFAULT_TAGS.forEach(function(tag) {
+              tags[tag.id] = tag;
+            });
+            var data = {};
+            data[self.STORAGE_KEYS.TAGS] = tags;
+            chrome.storage.local.set(data, function() {
+              callback(tags);
+            });
+          } else {
+            callback(tags);
+          }
+        });
+      } else {
+        var tags = result[self.STORAGE_KEYS.TAGS] || {};
+        if (Object.keys(tags).length === 0) {
+          tags = {};
+          self.DEFAULT_TAGS.forEach(function(tag) {
+            tags[tag.id] = tag;
+          });
+          var data = {};
+          data[self.STORAGE_KEYS.TAGS] = tags;
+          chrome.storage.sync.set(data, function() {
+            if (chrome.runtime.lastError) {
+              chrome.storage.local.set(data, function() {
+                callback(tags);
+              });
+            } else {
+              callback(tags);
+            }
+          });
+        } else {
+          callback(tags);
         }
       }
+    });
+  },
 
-      articles[id] = {
-        id,
-        url: String(item.url),
-        title: this.sanitizeInput(item.title || 'Untitled'),
-        author: '',
-        thumbnail: '',
-        savedAt: Date.now(),
-        progress: 0,
-        tags: articleTags,
-        folder: null,
-        notes: this.sanitizeInput(item.notes || ''),
-        isFavorite: false
-      };
-    }
+  createTag: function(name, color, callback) {
+    var self = this;
+    this.getTags(function(tags) {
+      var id = self.generateId();
+      tags[id] = { id: id, name: name, color: color };
+      
+      var data = {};
+      data[self.STORAGE_KEYS.TAGS] = tags;
+      
+      chrome.storage.sync.set(data, function() {
+        if (chrome.runtime.lastError) {
+          chrome.storage.local.set(data, function() {
+            if (callback) callback(tags[id]);
+          });
+        } else {
+          if (callback) callback(tags[id]);
+        }
+      });
+    });
+  },
 
-    try {
-      await chrome.storage.sync.set({ [this.STORAGE_KEYS.ARTICLES]: articles });
-    } catch (e) {
-      await chrome.storage.local.set({ [this.STORAGE_KEYS.ARTICLES]: articles });
+  deleteTag: function(tagId, callback) {
+    var self = this;
+    var tagsData, articlesData;
+    
+    function doDelete() {
+      delete tagsData[tagId];
+      
+      Object.keys(articlesData).forEach(function(key) {
+        var article = articlesData[key];
+        if (article.tags) {
+          article.tags = article.tags.filter(function(t) { return t !== tagId; });
+        }
+      });
+
+      var data = {};
+      data[self.STORAGE_KEYS.TAGS] = tagsData;
+      data[self.STORAGE_KEYS.ARTICLES] = articlesData;
+      
+      chrome.storage.sync.set(data, function() {
+        if (chrome.runtime.lastError) {
+          chrome.storage.local.set(data, function() {
+            if (callback) callback();
+          });
+        } else {
+          if (callback) callback();
+        }
+      });
     }
+    
+    this.getTags(function(tags) {
+      tagsData = tags;
+      self.getArticles(function(articles) {
+        articlesData = articles;
+        doDelete();
+      });
+    });
+  },
+
+  getFolders: function(callback) {
+    var self = this;
+    chrome.storage.sync.get(this.STORAGE_KEYS.FOLDERS, function(result) {
+      if (chrome.runtime.lastError) {
+        chrome.storage.local.get(self.STORAGE_KEYS.FOLDERS, function(localResult) {
+          var folders = localResult[self.STORAGE_KEYS.FOLDERS] || {};
+          if (Object.keys(folders).length === 0) {
+            folders = {};
+            self.DEFAULT_FOLDERS.forEach(function(folder) {
+              folders[folder.id] = folder;
+            });
+            var data = {};
+            data[self.STORAGE_KEYS.FOLDERS] = folders;
+            chrome.storage.local.set(data, function() {
+              callback(folders);
+            });
+          } else {
+            callback(folders);
+          }
+        });
+      } else {
+        var folders = result[self.STORAGE_KEYS.FOLDERS] || {};
+        if (Object.keys(folders).length === 0) {
+          folders = {};
+          self.DEFAULT_FOLDERS.forEach(function(folder) {
+            folders[folder.id] = folder;
+          });
+          var data = {};
+          data[self.STORAGE_KEYS.FOLDERS] = folders;
+          chrome.storage.sync.set(data, function() {
+            if (chrome.runtime.lastError) {
+              chrome.storage.local.set(data, function() {
+                callback(folders);
+              });
+            } else {
+              callback(folders);
+            }
+          });
+        } else {
+          callback(folders);
+        }
+      }
+    });
+  },
+
+  createFolder: function(name, callback) {
+    var self = this;
+    this.getFolders(function(folders) {
+      var id = self.generateId();
+      var order = Object.keys(folders).length;
+      folders[id] = { id: id, name: name, order: order };
+      
+      var data = {};
+      data[self.STORAGE_KEYS.FOLDERS] = folders;
+      
+      chrome.storage.sync.set(data, function() {
+        if (chrome.runtime.lastError) {
+          chrome.storage.local.set(data, function() {
+            if (callback) callback(folders[id]);
+          });
+        } else {
+          if (callback) callback(folders[id]);
+        }
+      });
+    });
+  },
+
+  deleteFolder: function(folderId, callback) {
+    var self = this;
+    var foldersData, articlesData;
+    
+    function doDelete() {
+      delete foldersData[folderId];
+      
+      Object.keys(articlesData).forEach(function(key) {
+        var article = articlesData[key];
+        if (article.folder === folderId) {
+          article.folder = null;
+        }
+      });
+
+      var data = {};
+      data[self.STORAGE_KEYS.FOLDERS] = foldersData;
+      data[self.STORAGE_KEYS.ARTICLES] = articlesData;
+      
+      chrome.storage.sync.set(data, function() {
+        if (chrome.runtime.lastError) {
+          chrome.storage.local.set(data, function() {
+            if (callback) callback();
+          });
+        } else {
+          if (callback) callback();
+        }
+      });
+    }
+    
+    this.getFolders(function(folders) {
+      foldersData = folders;
+      self.getArticles(function(articles) {
+        articlesData = articles;
+        doDelete();
+      });
+    });
+  },
+
+  getSettings: function(callback) {
+    var self = this;
+    chrome.storage.sync.get(this.STORAGE_KEYS.SETTINGS, function(result) {
+      if (chrome.runtime.lastError) {
+        chrome.storage.local.get(self.STORAGE_KEYS.SETTINGS, function(localResult) {
+          var settings = localResult[self.STORAGE_KEYS.SETTINGS] || {};
+          var merged = {};
+          Object.keys(self.DEFAULT_SETTINGS).forEach(function(k) {
+            merged[k] = self.DEFAULT_SETTINGS[k];
+          });
+          Object.keys(settings).forEach(function(k) {
+            merged[k] = settings[k];
+          });
+          callback(merged);
+        });
+      } else {
+        var settings = result[self.STORAGE_KEYS.SETTINGS] || {};
+        var merged = {};
+        Object.keys(self.DEFAULT_SETTINGS).forEach(function(k) {
+          merged[k] = self.DEFAULT_SETTINGS[k];
+        });
+        Object.keys(settings).forEach(function(k) {
+          merged[k] = settings[k];
+        });
+        callback(merged);
+      }
+    });
+  },
+
+  updateSettings: function(settings, callback) {
+    var self = this;
+    this.getSettings(function(current) {
+      var updated = {};
+      Object.keys(current).forEach(function(k) {
+        updated[k] = current[k];
+      });
+      Object.keys(settings).forEach(function(k) {
+        updated[k] = settings[k];
+      });
+      
+      var data = {};
+      data[self.STORAGE_KEYS.SETTINGS] = updated;
+      
+      chrome.storage.sync.set(data, function() {
+        if (chrome.runtime.lastError) {
+          chrome.storage.local.set(data, function() {
+            if (callback) callback(updated);
+          });
+        } else {
+          if (callback) callback(updated);
+        }
+      });
+    });
+  },
+
+  getAllProgressFromLocal: function(callback) {
+    chrome.storage.local.get(null, function(all) {
+      var progressData = {};
+      if (all) {
+        Object.keys(all).forEach(function(key) {
+          if (key.indexOf('substacksaver_progress_') === 0) {
+            var id = key.replace('substacksaver_progress_', '');
+            progressData[id] = all[key].progress;
+          }
+        });
+      }
+      callback(progressData);
+    });
+  },
+
+  searchArticles: function(query, filters, callback) {
+    if (typeof filters === 'undefined') filters = {};
+    var self = this;
+    
+    this.getArticles(function(articles) {
+      self.getTags(function(tags) {
+        self.getAllProgressFromLocal(function(allProgress) {
+          var results = Object.keys(articles).map(function(key) {
+            return articles[key];
+          });
+          
+          results.forEach(function(article) {
+            var id = self.hashCode(article.url);
+            var localProgress = allProgress[id] || 0;
+            if (localProgress > article.progress) {
+              article.progress = localProgress;
+            }
+          });
+          
+          if (query) {
+            var q = query.toLowerCase();
+            results = results.filter(function(article) {
+              var titleMatch = article.title && article.title.toLowerCase().indexOf(q) !== -1;
+              var authorMatch = article.author && article.author.toLowerCase().indexOf(q) !== -1;
+              return titleMatch || authorMatch;
+            });
+          }
+
+          if (filters.status) {
+            if (filters.status === 'unread') {
+              results = results.filter(function(a) { return a.progress === 0; });
+            } else if (filters.status === 'in-progress') {
+              results = results.filter(function(a) { return a.progress > 0 && a.progress < 100; });
+            } else if (filters.status === 'completed') {
+              results = results.filter(function(a) { return a.progress >= 100; });
+            }
+          }
+
+          if (filters.tags && filters.tags.length > 0) {
+            results = results.filter(function(a) {
+              return a.tags && a.tags.some(function(t) { return filters.tags.indexOf(t) !== -1; });
+            });
+          }
+
+          if (filters.folder) {
+            results = results.filter(function(a) { return a.folder === filters.folder; });
+          }
+
+          if (filters.favorites) {
+            results = results.filter(function(a) { return a.isFavorite; });
+          }
+
+          var sortBy = filters.sortBy || 'savedAt';
+          var sortOrder = filters.sortOrder || 'desc';
+          
+          results.sort(function(a, b) {
+            var comparison = 0;
+            if (sortBy === 'title') {
+              comparison = (a.title || '').localeCompare(b.title || '');
+            } else if (sortBy === 'progress') {
+              comparison = a.progress - b.progress;
+            } else {
+              comparison = a.savedAt - b.savedAt;
+            }
+            return sortOrder === 'desc' ? -comparison : comparison;
+          });
+
+          callback(results);
+        });
+      });
+    });
+  },
+
+  exportToEdgeCollections: function(callback) {
+    var self = this;
+    this.getArticles(function(articles) {
+      self.getTags(function(tags) {
+        var items = Object.keys(articles).map(function(key) {
+          var article = articles[key];
+          var articleTags = [];
+          if (article.tags) {
+            article.tags.forEach(function(t) {
+              if (tags[t] && tags[t].name) {
+                articleTags.push(tags[t].name);
+              }
+            });
+          }
+          return {
+            title: article.title,
+            url: article.url,
+            notes: article.notes || '',
+            tags: articleTags
+          };
+        });
+        
+        callback({
+          name: "SubstackSaver Export",
+          items: items
+        });
+      });
+    });
+  },
+
+  importFromEdgeCollections: function(collectionData, callback) {
+    if (!collectionData || typeof collectionData !== 'object') {
+      if (callback) callback(new Error('Invalid import data'));
+      return;
+    }
+    
+    var self = this;
+    var items = Array.isArray(collectionData.items) ? collectionData.items : [];
+    
+    this.getArticles(function(articles) {
+      self.getTags(function(tags) {
+        items.forEach(function(item) {
+          if (!item || typeof item !== 'object' || !item.url) {
+            return;
+          }
+          
+          var id = self.hashCode(item.url);
+          
+          var articleTags = [];
+          if (Array.isArray(item.tags)) {
+            item.tags.forEach(function(tagName) {
+              if (typeof tagName !== 'string') return;
+              var normalizedName = tagName.toLowerCase();
+              Object.keys(tags).forEach(function(tid) {
+                if (tags[tid].name.toLowerCase() === normalizedName) {
+                  articleTags.push(tid);
+                }
+              });
+            });
+          }
+
+          articles[id] = {
+            id: id,
+            url: String(item.url),
+            title: self.sanitizeInput(item.title || 'Untitled'),
+            author: '',
+            thumbnail: '',
+            savedAt: Date.now(),
+            progress: 0,
+            tags: articleTags,
+            folder: null,
+            notes: self.sanitizeInput(item.notes || ''),
+            isFavorite: false
+          };
+        });
+
+        var data = {};
+        data[self.STORAGE_KEYS.ARTICLES] = articles;
+        
+        chrome.storage.sync.set(data, function() {
+          if (chrome.runtime.lastError) {
+            chrome.storage.local.set(data, function() {
+              if (callback) callback();
+            });
+          } else {
+            if (callback) callback();
+          }
+        });
+      });
+    });
   }
 };
 
