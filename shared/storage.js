@@ -280,8 +280,8 @@ window.storage = {
     if (query) {
       const q = query.toLowerCase();
       results = results.filter(article => 
-        article.title.toLowerCase().includes(q) ||
-        article.author.toLowerCase().includes(q) ||
+        (article.title || '').toLowerCase().includes(q) ||
+        (article.author || '').toLowerCase().includes(q) ||
         (tags[article.tags[0]]?.name || '').toLowerCase().includes(q)
       );
     }

@@ -38,7 +38,13 @@ function hashCode(str) {
 }
 
 function isSubstackUrl(url) {
-  return url && url.includes('substack.com');
+  if (!url) return false;
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname.endsWith('substack.com') || hostname.endsWith('substack.email');
+  } catch {
+    return false;
+  }
 }
 
 async function saveArticle(article) {

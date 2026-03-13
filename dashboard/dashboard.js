@@ -308,7 +308,11 @@
         const id = utils.hashCode(url);
         if (articlesData[id]) {
           articlesData[id].isFavorite = !articlesData[id].isFavorite;
-          await chrome.storage.sync.set({ articles: articlesData });
+          try {
+            await chrome.storage.sync.set({ articles: articlesData });
+          } catch (err) {
+            await chrome.storage.local.set({ articles: articlesData });
+          }
           await loadData();
           renderArticles();
           updateCounts();

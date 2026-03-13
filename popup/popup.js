@@ -58,9 +58,9 @@
             '';
           
           return {
-            title: ogTitle,
-            author: author.replace(/^by\s+/i, ''),
-            thumbnail: ogImage
+            title: ogTitle || '',
+            author: (author || '').replace(/^by\s+/i, ''),
+            thumbnail: ogImage || ''
           };
         }
       });
@@ -272,15 +272,20 @@
       } else {
         saveBtn.classList.add('loading');
         
-        await storage.saveArticle({
-          ...currentArticle,
-          tags: selectedTags,
-          folder: selectedFolder
-        });
-        
-        saveBtn.classList.remove('loading');
-        saveBtn.classList.add('saved');
-        document.getElementById('saveBtn').innerHTML = '<span class="btn-text">✓ Saved</span>';
+        try {
+          await storage.saveArticle({
+            ...currentArticle,
+            tags: selectedTags,
+            folder: selectedFolder
+          });
+          
+          saveBtn.classList.remove('loading');
+          saveBtn.classList.add('saved');
+          document.getElementById('saveBtn').innerHTML = '<span class="btn-text">✓ Saved</span>';
+        } catch (e) {
+          saveBtn.classList.remove('loading');
+          console.error('Failed to save:', e);
+        }
       }
     });
   }
