@@ -1,114 +1,131 @@
 window.utils = {
-  generateId() {
+  generateId: function() {
     return Date.now().toString(36) + Math.random().toString(36).substring(2);
   },
 
-  hashCode(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
+  hashCode: function(str) {
+    var hash = 0;
+    for (var i = 0; i < str.length; i++) {
+      var char = str.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
       hash = hash & hash;
     }
     return Math.abs(hash).toString(36);
   },
 
-  getDomain(url) {
+  getDomain: function(url) {
     try {
       return new URL(url).hostname;
-    } catch {
+    } catch (e) {
       return '';
     }
   },
 
-  isSubstackUrl(url) {
+  isSubstackUrl: function(url) {
     if (!url) return false;
     try {
-      const parsedUrl = new URL(url);
-      return parsedUrl.hostname.includes('substack.com');
-    } catch {
+      var parsedUrl = new URL(url);
+      return parsedUrl.hostname.indexOf('substack.com') !== -1;
+    } catch (e) {
       return false;
     }
   },
 
-  escapeHtml(str) {
+  escapeHtml: function(str) {
     if (str == null) return '';
-    const div = document.createElement('div');
+    var div = document.createElement('div');
     div.textContent = String(str);
     return div.innerHTML;
   },
 
-  formatDate(timestamp) {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now - date;
+  formatDate: function(timestamp) {
+    var date = new Date(timestamp);
+    var now = new Date();
+    var diff = now - date;
     
     if (diff < 60000) return 'Just now';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-    if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
+    if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+    if (diff < 604800000) return Math.floor(diff / 86400000) + 'd ago';
     
+    var yearPart = date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined;
     return date.toLocaleDateString('en-US', { 
       month: 'short', 
       day: 'numeric',
-      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+      year: yearPart
     });
   },
 
-  truncate(str, length = 60) {
+  truncate: function(str, length) {
     if (!str) return '';
+    if (length === undefined) length = 60;
     return str.length > length ? str.substring(0, length) + '...' : str;
   },
 
-  debounce(fn, delay = 300) {
-    let timeout;
-    return function(...args) {
+  debounce: function(fn, delay) {
+    if (delay === undefined) delay = 300;
+    var timeout;
+    return function() {
+      var context = this;
+      var args = arguments;
       clearTimeout(timeout);
-      timeout = setTimeout(() => fn.apply(this, args), delay);
+      timeout = setTimeout(function() {
+        fn.apply(context, args);
+      }, delay);
     };
   },
 
-  throttle(fn, limit = 100) {
-    let inThrottle;
-    return function(...args) {
+  throttle: function(fn, limit) {
+    if (limit === undefined) limit = 100;
+    var inThrottle;
+    return function() {
+      var context = this;
+      var args = arguments;
       if (!inThrottle) {
-        fn.apply(this, args);
+        fn.apply(context, args);
         inThrottle = true;
-        setTimeout(() => inThrottle = false, limit);
+        setTimeout(function() { inThrottle = false; }, limit);
       }
     };
   },
 
-  async getActiveTab() {
-    try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      return tab;
-    } catch (e) {
-      return null;
-    }
+  getActiveTab: function(callback) {
+    chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+      if (tabs && tabs.length > 0) {
+        callback(tabs[0]);
+      } else {
+        callback(null);
+      }
+    });
   },
 
-  async getTheme() {
-    const result = await chrome.storage.sync.get(['settings']);
-    return result.settings?.theme || 'system';
+  getTheme: function(callback) {
+    chrome.storage.sync.get(['settings'], function(result) {
+      var theme = 'system';
+      if (result && result.settings && result.settings.theme) {
+        theme = result.settings.theme;
+      }
+      callback(theme);
+    });
   },
 
-  applyTheme(theme) {
-    const root = document.documentElement;
+  applyTheme: function(theme) {
+    var root = document.documentElement;
     if (theme === 'system') {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       root.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
     } else {
       root.setAttribute('data-theme', theme);
     }
   },
 
-  initThemeListener() {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    mq.addEventListener('change', () => {
-      chrome.storage.sync.get(['settings'], (result) => {
-        if (result.settings?.theme === 'system') {
-          this.applyTheme('system');
+  initThemeListener: function() {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var self = this;
+    mq.addEventListener('change', function() {
+      chrome.storage.sync.get(['settings'], function(result) {
+        if (result && result.settings && result.settings.theme === 'system') {
+          self.applyTheme('system');
         }
       });
     });

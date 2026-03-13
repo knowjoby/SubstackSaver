@@ -6,6 +6,20 @@ window.storage = {
     SETTINGS: 'settings'
   },
 
+  hashCode(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash).toString(36);
+  },
+
+  generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  },
+
   sanitizeInput(str) {
     if (str == null) return '';
     return String(str)
@@ -78,13 +92,13 @@ window.storage = {
 
   async getArticle(url) {
     const articles = await this.getArticles();
-    const id = utils.hashCode(url);
+    const id = this.hashCode(url);
     return articles[id] || null;
   },
 
   async updateArticleProgress(url, progress) {
     const articles = await this.getArticles();
-    const id = utils.hashCode(url);
+    const id = this.hashCode(url);
     if (articles[id]) {
       articles[id].progress = Math.min(100, Math.max(0, progress));
       try {
@@ -98,7 +112,7 @@ window.storage = {
 
   async deleteArticle(url) {
     const articles = await this.getArticles();
-    const id = utils.hashCode(url);
+    const id = this.hashCode(url);
     delete articles[id];
     try {
       await chrome.storage.sync.set({ [this.STORAGE_KEYS.ARTICLES]: articles });
@@ -141,7 +155,7 @@ window.storage = {
 
   async createTag(name, color) {
     const tags = await this.getTags();
-    const id = utils.generateId();
+    const id = this.generateId();
     tags[id] = { id, name, color };
     try {
       await chrome.storage.sync.set({ [this.STORAGE_KEYS.TAGS]: tags });
@@ -203,7 +217,7 @@ window.storage = {
 
   async createFolder(name) {
     const folders = await this.getFolders();
-    const id = utils.generateId();
+    const id = this.generateId();
     const order = Object.keys(folders).length;
     folders[id] = { id, name, order };
     await chrome.storage.sync.set({ [this.STORAGE_KEYS.FOLDERS]: folders });
@@ -280,7 +294,7 @@ window.storage = {
     let results = Object.values(articles);
     
     for (let article of results) {
-      const id = utils.hashCode(article.url);
+    const id = this.hashCode(article.url);
       const localProgress = allProgress[id] || 0;
       if (localProgress > article.progress) {
         article.progress = localProgress;

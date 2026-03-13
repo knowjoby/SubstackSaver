@@ -36,9 +36,9 @@ function hashCode(str) {
 function isSubstackUrl(url) {
   if (!url) return false;
   try {
-    const hostname = new URL(url).hostname;
-    return hostname.endsWith('substack.com') || hostname.endsWith('substack.email');
-  } catch {
+    var hostname = new URL(url).hostname;
+    return hostname.indexOf('substack.com') !== -1 || hostname.indexOf('substack.email') !== -1;
+  } catch (e) {
     return false;
   }
 }
@@ -147,94 +147,113 @@ async function initializeStorage() {
 }
 
 function createContextMenus() {
-  chrome.contextMenus?.removeAll();
+  if (chrome.contextMenus) {
+    chrome.contextMenus.removeAll();
+  }
 
-  chrome.contextMenus?.create({
-    id: 'saveToSubstackSaver',
-    title: 'Save to SubstackSaver',
-    contexts: ['page', 'link'],
-    documentUrlPatterns: ['*://*.substack.com/*']
-  });
+  if (chrome.contextMenus) {
+    chrome.contextMenus.create({
+      id: 'saveToSubstackSaver',
+      title: 'Save to SubstackSaver',
+      contexts: ['page', 'link'],
+      documentUrlPatterns: ['*://*.substack.com/*']
+    });
 
-  chrome.contextMenus?.create({
-    id: 'saveLinkToSubstackSaver',
-    title: 'Save link to SubstackSaver',
-    contexts: ['link'],
-    documentUrlPatterns: ['*://*.substack.com/*']
+    chrome.contextMenus.create({
+      id: 'saveLinkToSubstackSaver',
+      title: 'Save link to SubstackSaver',
+      contexts: ['link'],
+      documentUrlPatterns: ['*://*.substack.com/*']
+    });
+  }
+}
+
+if (chrome.runtime && chrome.runtime.onInstalled) {
+  chrome.runtime.onInstalled.addListener(function() {
+    initializeStorage();
+    createContextMenus();
   });
 }
 
-chrome.runtime?.onInstalled?.addListener(() => {
-  initializeStorage();
-  createContextMenus();
-});
+if (chrome.runtime && chrome.runtime.onStartup) {
+  chrome.runtime.onStartup.addListener(function() {
+    createContextMenus();
+  });
+}
 
-chrome.runtime?.onStartup?.addListener(() => {
-  createContextMenus();
-});
+if (chrome.contextMenus && chrome.contextMenus.onClicked) {
+  chrome.contextMenus.onClicked.addListener(function(info, tab) {
+    if (!tab || !tab.url || !isSubstackUrl(tab.url)) return;
 
-chrome.contextMenus?.onClicked?.addListener(async (info, tab) => {
-  if (!tab?.url || !isSubstackUrl(tab.url)) return;
-
-  if (info.menuItemId === 'saveToSubstackSaver') {
-    const url = info.linkUrl || tab.url;
-    
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      function: () => {
-        const getMeta = (prop) => 
-          document.querySelector(`meta[property="${prop}"]`)?.content ||
-          document.querySelector(`meta[name="${prop}"]`)?.content;
+    if (info.menuItemId === 'saveToSubstackSaver') {
+      var url = info.linkUrl || tab.url;
+      
+      chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        function: function() {
+          function getMeta(prop) {
+            var el = document.querySelector('meta[property="' + prop + '"]');
+            if (el) return el.content;
+            el = document.querySelector('meta[name="' + prop + '"]');
+            return el ? el.content : null;
+          }
+          
+          var ogTitle = getMeta('og:title') || document.title;
+          var ogImage = getMeta('og:image');
+          var authorEl = document.querySelector('meta[name="author"]');
+          var author = authorEl ? authorEl.content : '';
+          if (!author) {
+            var authorLink = document.querySelector('a[href*="/@"]');
+            if (authorLink) author = authorLink.textContent ? authorLink.textContent.trim() : '';
+          }
+          
+          return {
+            title: ogTitle || '',
+            author: author ? author.replace(/^by\s+/i, '') : '',
+            thumbnail: ogImage || ''
+          };
+        }
+      }, function(results) {
+        var pageInfo = results && results[0] && results[0].result ? results[0].result : { title: tab.title, author: '', thumbnail: '' };
         
-        const ogTitle = getMeta('og:title') || document.title;
-        const ogImage = getMeta('og:image');
-        const author = 
-          document.querySelector('meta[name="author"]')?.content ||
-          document.querySelector('[class*="author"]')?.textContent?.trim() ||
-          document.querySelector('a[href*="/@"]')?.textContent?.trim() ||
-          '';
-        
-        return {
-          title: ogTitle,
-          author: author.replace(/^by\s+/i, ''),
-          thumbnail: ogImage
-        };
-      }
-    });
+        saveArticle({
+          url: tab.url,
+          title: pageInfo.title || tab.title,
+          author: pageInfo.author || '',
+          thumbnail: pageInfo.thumbnail || ''
+        });
 
-    const pageInfo = results[0]?.result || { title: tab.title, author: '', thumbnail: '' };
+        chrome.tabs.sendMessage(tab.id, { action: 'saved' });
+      });
+    }
+
+    if (info.menuItemId === 'saveLinkToSubstackSaver' && info.linkUrl) {
+      var linkUrl = info.linkUrl;
+      
+      saveArticle({
+        url: linkUrl,
+        title: linkUrl.split('/').pop() || 'Substack Article',
+        author: '',
+        thumbnail: ''
+      });
+    }
+  });
+}
+
+if (chrome.action && chrome.action.onClicked) {
+  chrome.action.onClicked.addListener(function(tab) {
+    if (tab && tab.url && tab.url.indexOf('dashboard.html') !== -1) return;
     
-    await saveArticle({
-      url: tab.url,
-      title: pageInfo.title || tab.title,
-      author: pageInfo.author || '',
-      thumbnail: pageInfo.thumbnail || ''
-    });
-
-    chrome.tabs.sendMessage(tab.id, { action: 'saved' });
-  }
-
-  if (info.menuItemId === 'saveLinkToSubstackSaver' && info.linkUrl) {
-    const linkUrl = info.linkUrl;
-    
-    await saveArticle({
-      url: linkUrl,
-      title: linkUrl.split('/').pop() || 'Substack Article',
-      author: '',
-      thumbnail: ''
-    });
-  }
-});
-
-chrome.action?.onClicked?.addListener(async (tab) => {
-  if (tab?.url?.includes('dashboard.html')) return;
-  
-  const dashboardUrl = chrome.runtime?.getURL('dashboard/dashboard.html');
-  if (tab?.id) {
-    chrome.tabs.create({ url: dashboardUrl, index: tab.index + 1 });
-  } else {
-    chrome.tabs.create({ url: dashboardUrl });
-  }
-});
+    var dashboardUrl = '';
+    if (chrome.runtime && chrome.runtime.getURL) {
+      dashboardUrl = chrome.runtime.getURL('dashboard/dashboard.html');
+    }
+    if (tab && tab.id) {
+      chrome.tabs.create({ url: dashboardUrl, index: tab.index + 1 });
+    } else {
+      chrome.tabs.create({ url: dashboardUrl });
+    }
+  });
+}
 
 console.log('SubstackSaver: Background script loaded');

@@ -7,7 +7,7 @@
       utils.applyTheme(settings.theme || 'system');
     });
     
-    utils.getActiveTab().then(function(tab) {
+    utils.getActiveTab(function(tab) {
       if (!tab || !utils.isSubstackUrl(tab.url)) {
         showNotSubstack();
         return;

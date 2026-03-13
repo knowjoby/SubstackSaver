@@ -50,9 +50,6 @@
     allTags = await storage.getTags();
     allFolders = {};
   }
-      </div>
-    `).join('');
-  }
 
   function setupEventListeners() {
     const searchInput = document.getElementById('searchInput');
