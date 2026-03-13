@@ -8,7 +8,7 @@
     
     const tab = await utils.getActiveTab();
     
-    if (!tab || !utils.isSubstackUrl(tab.url)) {
+    if (!tab || !utils.isSubstackUrl(tab.url) {
       showNotSubstack();
       return;
     }
