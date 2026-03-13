@@ -9,6 +9,7 @@
   let selectedFolder = null;
   let allTags = {};
   let allFolders = {};
+  let isSaving = false;
 
   async function init() {
     const settings = await storage.getSettings();
@@ -51,27 +52,41 @@
           
           const ogTitle = getMeta('og:title') || document.title;
           const ogImage = getMeta('og:image');
+          const ogDescription = getMeta('og:description') || '';
           const author = 
             document.querySelector('meta[name="author"]')?.content ||
             document.querySelector('[class*="author"]')?.textContent?.trim() ||
             document.querySelector('a[href*="/@"]')?.textContent?.trim() ||
             '';
           
+          let excerpt = ogDescription;
+          if (!excerpt) {
+            const articleBody = document.querySelector('article') || document.querySelector('[class*="article"]');
+            if (articleBody) {
+              const paragraphs = articleBody.querySelectorAll('p');
+              if (paragraphs.length > 0) {
+                excerpt = Array.from(paragraphs).slice(0, 2).map(p => p.textContent).join(' ').trim();
+              }
+            }
+          }
+          
           return {
             title: ogTitle || '',
             author: (author || '').replace(/^by\s+/i, ''),
-            thumbnail: ogImage || ''
+            thumbnail: ogImage || '',
+            excerpt: (excerpt || '').substring(0, 300)
           };
         }
       });
 
-      const info = results[0]?.result || { title: tab.title, author: '', thumbnail: '' };
+      const info = results[0]?.result || { title: tab.title, author: '', thumbnail: '', excerpt: '' };
       
       currentArticle = {
         url: tab.url,
         title: info.title || tab.title,
         author: info.author || '',
-        thumbnail: info.thumbnail || ''
+        thumbnail: info.thumbnail || '',
+        excerpt: info.excerpt || ''
       };
 
       document.getElementById('articleTitle').textContent = currentArticle.title;
@@ -178,8 +193,6 @@
     document.getElementById('selectedFolder').textContent = folderText;
   }
 
-  let isSaving = false;
-
   function setupEventListeners() {
     const tagBtn = document.getElementById('tagDropdownBtn');
     const tagMenu = document.getElementById('tagDropdownMenu');
@@ -246,8 +259,6 @@
       
       isSaving = false;
     });
-  }
-    });
 
     tagMenu.addEventListener('click', async (e) => {
       const tagOption = e.target.closest('.tag-option');
@@ -293,39 +304,6 @@
         renderTagDropdown();
         renderSelectedTags();
         newTagInput.value = '';
-      }
-    });
-
-    saveBtn.addEventListener('click', async () => {
-      if (!currentArticle) return;
-      
-      const isSaved = document.getElementById('saveBtn').classList.contains('saved');
-      
-      if (isSaved) {
-        await storage.deleteArticle(currentArticle.url);
-        document.getElementById('saveBtn').classList.remove('saved');
-        document.getElementById('saveBtn').innerHTML = '<span class="btn-text">Save to Reading List</span>';
-        selectedTags = [];
-        selectedFolder = null;
-        renderSelectedTags();
-        renderSelectedFolder();
-      } else {
-        saveBtn.classList.add('loading');
-        
-        try {
-          await storage.saveArticle({
-            ...currentArticle,
-            tags: selectedTags,
-            folder: selectedFolder
-          });
-          
-          saveBtn.classList.remove('loading');
-          saveBtn.classList.add('saved');
-          document.getElementById('saveBtn').innerHTML = '<span class="btn-text">✓ Saved</span>';
-        } catch (e) {
-          saveBtn.classList.remove('loading');
-          console.error('Failed to save:', e);
-        }
       }
     });
   }

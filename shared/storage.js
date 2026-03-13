@@ -53,6 +53,7 @@ window.storage = {
       title: this.sanitizeInput(article.title),
       author: this.sanitizeInput(article.author || ''),
       thumbnail: article.thumbnail || '',
+      excerpt: this.sanitizeInput(article.excerpt || ''),
       savedAt: Date.now(),
       progress: article.progress || 0,
       tags: article.tags || [],
