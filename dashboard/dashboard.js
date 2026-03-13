@@ -575,6 +575,7 @@
   }
 
   function selectAllArticles() {
+    selectedArticles = [];
     var cards = document.querySelectorAll('.article-card');
     cards.forEach(function(card) {
       var url = decodeURIComponent(card.dataset.url);
