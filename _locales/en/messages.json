@@ -1,0 +1,10 @@
+{
+  "extension_name": {
+    "message": "SubstackSaver",
+    "description": "The name of the extension"
+  },
+  "extension_description": {
+    "message": "Enhance your Substack reading experience with quick-save, progress tracking, and organized bookmarking.",
+    "description": "The description of the extension"
+  }
+}

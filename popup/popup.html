@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=320">
+  <title>SubstackSaver</title>
+  <link rel="stylesheet" href="../shared/styles/fluent.css">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      width: 320px;
+      min-height: 200px;
+      padding: var(--space-lg);
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-lg);
+      padding-bottom: var(--space-md);
+      border-bottom: 1px solid var(--border);
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-weight: 600;
+      font-size: 15px;
+    }
+    .logo svg {
+      width: 20px;
+      height: 20px;
+      color: var(--accent);
+    }
+    .sync-status {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      font-size: 11px;
+      color: var(--text-secondary);
+      background: var(--bg-secondary);
+      padding: 2px 8px;
+      border-radius: 100px;
+    }
+    .sync-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--success);
+    }
+    .article-preview {
+      display: flex;
+      gap: var(--space-md);
+      padding: var(--space-md);
+      background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-lg);
+      border: 1px solid var(--border);
+    }
+    .thumbnail {
+      width: 80px;
+      height: 45px;
+      border-radius: var(--radius-sm);
+      object-fit: cover;
+      background: var(--bg-tertiary);
+      flex-shrink: 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .article-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .article-title {
+      font-weight: 600;
+      font-size: 13px;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin-bottom: var(--space-xs);
+    }
+    .article-author {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .progress-section {
+      margin-bottom: var(--space-lg);
+    }
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: var(--space-xs);
+    }
+    .tag-selector {
+      margin-bottom: var(--space-lg);
+    }
+    .tag-selector-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: var(--space-sm);
+      display: block;
+    }
+    .tag-dropdown {
+      position: relative;
+    }
+    .tag-dropdown-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: var(--space-sm) var(--space-md);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      text-align: left;
+    }
+    .tag-dropdown-btn:hover {
+      border-color: var(--accent);
+    }
+    .selected-tags {
+      display: flex;
+      gap: var(--space-xs);
+      flex-wrap: wrap;
+    }
+    .tag-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 100px;
+      font-size: 11px;
+      background: var(--bg-tertiary);
+    }
+    .tag-dropdown-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-elevated);
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 100;
+    }
+    .tag-dropdown-menu.open {
+      display: block;
+    }
+    .tag-option {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      cursor: pointer;
+      transition: background var(--transition-fast);
+    }
+    .tag-option:hover {
+      background: var(--bg-secondary);
+    }
+    .tag-option.selected {
+      background: var(--bg-tertiary);
+    }
+    .new-tag-input {
+      display: flex;
+      gap: var(--space-xs);
+      padding: var(--space-sm);
+      border-top: 1px solid var(--border);
+    }
+    .new-tag-input input {
+      flex: 1;
+      min-width: 0;
+    }
+    .color-picker {
+      display: flex;
+      gap: 4px;
+    }
+    .color-option {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: border-color var(--transition-fast);
+    }
+    .color-option:hover,
+    .color-option.selected {
+      border-color: var(--text-primary);
+    }
+    .save-btn {
+      width: 100%;
+      height: 44px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      transition: all 0.2s ease;
+    }
+    .save-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .save-btn:active {
+      transform: translateY(0);
+    }
+    .save-btn.saved {
+      background: var(--success);
+    }
+    .save-btn.saved:hover {
+      background: var(--success);
+      opacity: 0.9;
+    }
+    .save-btn.loading .btn-text {
+      display: none;
+    }
+    .save-btn.loading .spinner {
+      display: block;
+    }
+    .save-btn .spinner {
+      display: none;
+    }
+    .dashboard-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xs);
+      margin-top: var(--space-md);
+      color: var(--text-secondary);
+      font-size: 12px;
+    }
+    .dashboard-link:hover {
+      color: var(--accent);
+    }
+    .not-substack {
+      text-align: center;
+      padding: var(--space-xl);
+    }
+    .not-substack svg {
+      width: 48px;
+      height: 48px;
+      color: var(--text-secondary);
+      margin-bottom: var(--space-md);
+      opacity: 0.5;
+    }
+    .not-substack h3 {
+      font-size: 14px;
+      margin-bottom: var(--space-sm);
+    }
+    .not-substack p {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .folder-selector {
+      margin-bottom: var(--space-lg);
+    }
+    .folder-dropdown {
+      position: relative;
+    }
+    .folder-dropdown-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: var(--space-sm) var(--space-md);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      text-align: left;
+    }
+    .folder-dropdown-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-elevated);
+      max-height: 180px;
+      overflow-y: auto;
+      z-index: 100;
+    }
+    .folder-dropdown-menu.open {
+      display: block;
+    }
+    .folder-option {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      cursor: pointer;
+      transition: background var(--transition-fast);
+    }
+    .folder-option:hover {
+      background: var(--bg-secondary);
+    }
+    .folder-option.selected {
+      background: var(--bg-tertiary);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+      </svg>
+      <span>SubstackSaver</span>
+    </div>
+    <div class="sync-status">
+      <span class="sync-dot"></span>
+      <span>Synced</span>
+    </div>
+  </div>
+
+  <div id="content">
+    <div class="not-substack" id="notSubstack" style="display: none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M16 16s-1.5-2-4-2-4 2-4 2"/>
+        <line x1="9" y1="9" x2="9.01" y2="9"/>
+        <line x1="15" y1="9" x2="15.01" y2="9"/>
+      </svg>
+      <h3>Not a Substack Page</h3>
+      <p>This extension works on Substack articles only.</p>
+    </div>
+
+    <div id="saveContent">
+      <div class="article-preview">
+        <img class="thumbnail" id="thumbnail" src="" alt="">
+        <div class="article-info">
+          <div class="article-title" id="articleTitle">Loading...</div>
+          <div class="article-author" id="articleAuthor"></div>
+        </div>
+      </div>
+
+      <div class="progress-section" id="progressSection" style="display: none;">
+        <div class="progress-label">
+          <span>Reading Progress</span>
+          <span id="progressText">0%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-bar-fill" id="progressFill" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div class="tag-selector">
+        <label class="tag-selector-label">Tags</label>
+        <div class="tag-dropdown">
+          <button class="tag-dropdown-btn" id="tagDropdownBtn">
+            <span class="selected-tags" id="selectedTags">
+              <span style="color: var(--text-secondary); font-size: 12px;">Select tags...</span>
+            </span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+          <div class="tag-dropdown-menu" id="tagDropdownMenu"></div>
+        </div>
+      </div>
+
+      <div class="folder-selector">
+        <label class="tag-selector-label">Folder</label>
+        <div class="folder-dropdown">
+          <button class="folder-dropdown-btn" id="folderDropdownBtn">
+            <span id="selectedFolder">No folder</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+          <div class="folder-dropdown-menu" id="folderDropdownMenu"></div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary save-btn" id="saveBtn">
+        <span class="btn-text">Save to Reading List</span>
+        <div class="spinner"></div>
+      </button>
+
+      <a href="../dashboard/dashboard.html" target="_blank" class="dashboard-link">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"/>
+          <rect x="14" y="3" width="7" height="7"/>
+          <rect x="14" y="14" width="7" height="7"/>
+          <rect x="3" y="14" width="7" height="7"/>
+        </svg>
+        Open Dashboard
+      </a>
+    </div>
+  </div>
+
+  <script src="../shared/utils.js"></script>
+  <script src="../shared/storage.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
