@@ -6,21 +6,21 @@ window.storage = {
     SETTINGS: 'settings'
   },
 
-  hashCode(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
+  hashCode: function(str) {
+    var hash = 0;
+    for (var i = 0; i < str.length; i++) {
+      var char = str.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
       hash = hash & hash;
     }
     return Math.abs(hash).toString(36);
   },
 
-  generateId() {
+  generateId: function() {
     return Date.now().toString(36) + Math.random().toString(36).substring(2);
   },
 
-  sanitizeInput(str) {
+  sanitizeInput: function(str) {
     if (str == null) return '';
     return String(str)
       .replace(/&/g, '&amp;')
@@ -54,7 +54,7 @@ window.storage = {
   },
 
   async saveArticle(article) {
-    const id = utils.hashCode(article.url);
+    var id = this.hashCode(article.url);
     const articles = await this.getArticles();
     
     articles[id] = {
@@ -382,7 +382,7 @@ window.storage = {
         continue;
       }
       
-      const id = utils.hashCode(item.url);
+      var id = this.hashCode(item.url);
       
       let articleTags = [];
       if (Array.isArray(item.tags)) {

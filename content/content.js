@@ -1,15 +1,15 @@
 (function() {
-  const PROGRESS_STORAGE_KEY = 'substacksaver_progress';
-  const DEBOUNCE_DELAY = 500;
+  var PROGRESS_STORAGE_KEY = 'substacksaver_progress';
+  var DEBOUNCE_DELAY = 500;
   
-  let currentProgress = 0;
-  let saveTimeout = null;
-  let articleUrl = window.location.href.split('?')[0];
+  var currentProgress = 0;
+  var saveTimeout = null;
+  var articleUrl = window.location.href.split('?')[0];
 
   function hashCode(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
+    var hash = 0;
+    for (var i = 0; i < str.length; i++) {
+      var char = str.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
       hash = hash & hash;
     }
@@ -17,12 +17,12 @@
   }
 
   function calculateProgress() {
-    const scrollTop = window.scrollY || document.documentElement.scrollTop;
-    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    var scrollTop = window.scrollY || document.documentElement.scrollTop;
+    var docHeight = document.documentElement.scrollHeight - window.innerHeight;
     
     if (docHeight <= 0) return 100;
     
-    const progress = Math.min(100, Math.max(0, Math.round((scrollTop / docHeight) * 100)));
+    var progress = Math.min(100, Math.max(0, Math.round((scrollTop / docHeight) * 100)));
     return progress;
   }
 
@@ -31,13 +31,16 @@
       clearTimeout(saveTimeout);
     }
     
-    saveTimeout = setTimeout(async () => {
+    saveTimeout = setTimeout(function() {
       try {
-        await chrome.storage.local.set({
-          [`${PROGRESS_STORAGE_KEY}_${hashCode(articleUrl)}`]: {
-            progress: progress,
-            timestamp: Date.now()
-          }
+        var key = PROGRESS_STORAGE_KEY + '_' + hashCode(articleUrl);
+        var data = {};
+        data[key] = {
+          progress: progress,
+          timestamp: Date.now()
+        };
+        chrome.storage.local.set(data, function() {
+          // Saved
         });
       } catch (e) {
         console.log('SubstackSaver: Could not save progress', e);
@@ -45,22 +48,21 @@
     }, DEBOUNCE_DELAY);
   }
 
-  function getSavedProgress() {
-    return new Promise((resolve) => {
-      try {
-        chrome.storage.local.get([`${PROGRESS_STORAGE_KEY}_${hashCode(articleUrl)}`], (result) => {
-          const data = result[`${PROGRESS_STORAGE_KEY}_${hashCode(articleUrl)}`];
-          resolve(data ? data.progress : 0);
-        });
-      } catch (e) {
-        resolve(0);
-      }
-    });
+  function getSavedProgress(callback) {
+    try {
+      var key = PROGRESS_STORAGE_KEY + '_' + hashCode(articleUrl);
+      chrome.storage.local.get([key], function(result) {
+        var data = result[key];
+        callback(data ? data.progress : 0);
+      });
+    } catch (e) {
+      callback(0);
+    }
   }
 
   function scrollToProgress(progress) {
-    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-    const targetScroll = (progress / 100) * docHeight;
+    var docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    var targetScroll = (progress / 100) * docHeight;
     
     window.scrollTo({
       top: targetScroll,
@@ -69,21 +71,21 @@
   }
 
   function restoreProgress() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const progressParam = urlParams.get('progress');
+    var urlParams = new URLSearchParams(window.location.search);
+    var progressParam = urlParams.get('progress');
     
     if (progressParam) {
-      const progress = parseInt(progressParam, 10);
+      var progress = parseInt(progressParam, 10);
       if (!isNaN(progress)) {
-        setTimeout(() => {
+        setTimeout(function() {
           scrollToProgress(progress);
           
-          const cleanUrl = window.location.href.replace(/[?&]progress=\d+/g, '').replace(/[?&]from=substacksaver/g, '');
+          var cleanUrl = window.location.href.replace(/[?&]progress=\d+/g, '').replace(/[?&]from=substacksaver/g, '');
           window.history.replaceState({}, document.title, cleanUrl);
         }, 500);
       }
     } else {
-      getSavedProgress().then(progress => {
+      getSavedProgress(function(progress) {
         if (progress > 0) {
           scrollToProgress(progress);
         }
@@ -93,17 +95,17 @@
 
   function init() {
     try {
-      const hostname = window.location.hostname;
-      if (!hostname.endsWith('substack.com') && !hostname.endsWith('substack.email')) {
+      var hostname = window.location.hostname;
+      if (hostname.indexOf('substack.com') === -1 && hostname.indexOf('substack.email') === -1) {
         return;
       }
     } catch (e) {
       return;
     }
 
-    const isArticlePage = document.querySelector('article') || 
-                          document.querySelector('[class*="post-content"]') ||
-                          document.querySelector('.piece-content');
+    var isArticlePage = document.querySelector('article') || 
+                        document.querySelector('[class*="post-content"]') ||
+                        document.querySelector('.piece-content');
 
     if (!isArticlePage) {
       return;
@@ -111,12 +113,13 @@
 
     restoreProgress();
 
-    let ticking = false;
+    var ticking = false;
     
-    window.addEventListener('scroll', () => {
+    window.addEventListener('scroll', function() {
       if (!ticking) {
-        requestAnimationFrame(() => {
-          const progress = calculateProgress();
+        var self = this;
+        requestAnimationFrame(function() {
+          var progress = calculateProgress();
           
           if (progress !== currentProgress) {
             currentProgress = progress;
@@ -125,20 +128,22 @@
           
           ticking = false;
         });
-        
         ticking = true;
       }
     });
 
-    window.addEventListener('beforeunload', () => {
-      const progress = calculateProgress();
+    window.addEventListener('beforeunload', function() {
+      var progress = calculateProgress();
       if (progress > 0) {
         try {
-          chrome.storage.local.set({
-            [`${PROGRESS_STORAGE_KEY}_${hashCode(articleUrl)}`]: {
-              progress: progress,
-              timestamp: Date.now()
-            }
+          var key = PROGRESS_STORAGE_KEY + '_' + hashCode(articleUrl);
+          var data = {};
+          data[key] = {
+            progress: progress,
+            timestamp: Date.now()
+          };
+          chrome.storage.local.set(data, function() {
+            // Saved
           });
         } catch (e) {
           console.log('SubstackSaver: Could not save final progress', e);

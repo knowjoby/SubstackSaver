@@ -42,7 +42,7 @@
   "web_accessible_resources": [
     {
       "resources": ["dashboard/*", "shared/*"],
-      "matches": ["<all_urls>"]
+      "matches": ["*://*.substack.com/*"]
     }
   ],
   "default_locale": "en"

@@ -24,6 +24,14 @@
   --success: #107C10;
   --warning: #FFB900;
   --error: #D13438;
+  
+  /* Fallback theme values */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F3F3F3;
+  --bg-tertiary: #E5E5E5;
+  --text-primary: #1A1A1A;
+  --text-secondary: #5C5C5C;
+  --border: #E0E0E0;
 }
 
 [data-theme="light"] {
