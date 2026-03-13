@@ -4,7 +4,7 @@
   
   var currentProgress = 0;
   var saveTimeout = null;
-  var articleUrl = window.location.href.split('?')[0];
+  var articleUrl = window.location.href.split('?')[0].split('#')[0];
 
   function hashCode(str) {
     var hash = 0;

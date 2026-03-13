@@ -26,6 +26,8 @@
       utils.applyTheme(settings.theme || 'system');
       currentView = settings.defaultView || 'grid';
       
+      utils.initThemeListener();
+      
       loadData(function() {
         setupEventListeners();
         renderArticles();
@@ -53,10 +55,34 @@
       articles = results;
       storage.getTags(function(tags) {
         allTags = tags;
-        allFolders = {};
-        if (callback) callback();
+        storage.getFolders(function(folders) {
+          allFolders = folders;
+          renderFolders();
+          if (callback) callback();
+        });
       });
     });
+  }
+
+  function renderFolders() {
+    var container = document.getElementById('foldersList');
+    if (!container) return;
+    
+    var folders = Object.values(allFolders).sort(function(a, b) { return a.order - b.order; });
+    
+    if (folders.length === 0) {
+      container.innerHTML = '<div style="padding: 12px; color: var(--text-secondary); font-size: 12px;">No folders yet</div>';
+      return;
+    }
+    
+    container.innerHTML = folders.map(function(folder) {
+      return '<div class="folder-item" data-folder="' + utils.escapeHtml(folder.id) + '">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+        '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>' +
+        '</svg>' +
+        '<span>' + utils.escapeHtml(folder.name) + '</span>' +
+        '</div>';
+    }).join('');
   }
 
   function setupEventListeners() {
@@ -98,7 +124,7 @@
         navItems.forEach(function(i) { i.classList.remove('active'); });
         item.classList.add('active');
         
-        currentFilter = 'all';
+        currentFilter = item.dataset.filter || 'all';
         currentFolder = null;
         selectedArticles = [];
         updateBulkActions();
@@ -356,6 +382,10 @@
             try {
               var data = JSON.parse(event.target.result);
               storage.importFromEdgeCollections(data, function(err) {
+                if (err) {
+                  showToast('Import failed: ' + err.message, 'error');
+                  return;
+                }
                 loadData(function() {
                   renderArticles();
                   updateCounts();
@@ -878,7 +908,7 @@
     var html = '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="UTF-8">\n  <title>SubstackSaver Export</title>\n  <style>\n    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }\n    h1 { border-bottom: 2px solid #0078D4; padding-bottom: 10px; }\n    .article { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #eee; }\n    .article h2 { margin: 0 0 5px; }\n    .article a { color: #0078D4; text-decoration: none; }\n    .article .meta { color: #666; font-size: 14px; }\n  </style>\n</head>\n<body>\n  <h1>SubstackSaver Reading List</h1>\n  <p>' + articles.length + ' articles exported on ' + new Date().toLocaleDateString() + '</p>\n';
     
     articles.forEach(function(a) {
-      html += '  <div class="article">\n    <h2><a href="' + a.url + '" target="_blank">' + utils.escapeHtml(a.title) + '</a></h2>\n    <div class="meta">by ' + utils.escapeHtml(a.author || 'Unknown') + ' &bull; Saved ' + new Date(a.savedAt).toLocaleDateString() + '</div>\n  </div>\n';
+      html += '  <div class="article">\n    <h2><a href="' + utils.escapeHtml(a.url) + '" target="_blank">' + utils.escapeHtml(a.title) + '</a></h2>\n    <div class="meta">by ' + utils.escapeHtml(a.author || 'Unknown') + ' &bull; Saved ' + new Date(a.savedAt).toLocaleDateString() + '</div>\n  </div>\n';
     });
     
     html += '</body>\n</html>';
@@ -889,7 +919,8 @@
     var md = '# SubstackSaver Reading List\n\n' + articles.length + ' articles exported on ' + new Date().toLocaleDateString() + '\n\n';
     
     articles.forEach(function(a) {
-      md += '## [' + a.title + '](' + a.url + ')\n\nby ' + (a.author || 'Unknown') + ' &bull; Saved ' + new Date(a.savedAt).toLocaleDateString() + '\n\n---\n\n';
+      var mdTitle = (a.title || '').replace(/\]/g, '\\]');
+      md += '## [' + mdTitle + '](' + a.url + ')\n\nby ' + (a.author || 'Unknown') + ' &bull; Saved ' + new Date(a.savedAt).toLocaleDateString() + '\n\n---\n\n';
     });
     
     return md;

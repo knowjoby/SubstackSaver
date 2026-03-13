@@ -7,6 +7,8 @@
       utils.applyTheme(settings.theme || 'system');
     });
     
+    utils.initThemeListener();
+    
     utils.getActiveTab(function(tab) {
       if (!tab || !utils.isSubstackUrl(tab.url)) {
         showNotSubstack();
@@ -110,6 +112,10 @@
       var isSaved = saveBtn.classList.contains('saved');
       
       if (isSaved) {
+        if (!confirm('Remove this article from your reading list?')) {
+          isSaving = false;
+          return;
+        }
         storage.deleteArticle(currentArticle.url, function() {
           saveBtn.classList.remove('saved');
           saveBtn.innerHTML = '<span class="btn-text">Save to Reading List</span>';

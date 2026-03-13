@@ -201,10 +201,14 @@ if (chrome.runtime && chrome.runtime.onStartup) {
 
 if (chrome.contextMenus && chrome.contextMenus.onClicked) {
   chrome.contextMenus.onClicked.addListener(function(info, tab) {
-    if (!tab || !tab.url || !isSubstackUrl(tab.url)) return;
-
+    if (!tab || !tab.url) return;
+    
+    var pageUrl = tab.url;
+    var linkUrl = info.linkUrl;
+    
     if (info.menuItemId === 'saveToSubstackSaver') {
-      var url = info.linkUrl || tab.url;
+      var url = linkUrl || pageUrl;
+      if (!isSubstackUrl(url)) return;
       
       chrome.scripting.executeScript({
         target: { tabId: tab.id },
@@ -252,7 +256,7 @@ if (chrome.contextMenus && chrome.contextMenus.onClicked) {
       });
     }
 
-    if (info.menuItemId === 'saveLinkToSubstackSaver' && info.linkUrl) {
+    if (info.menuItemId === 'saveLinkToSubstackSaver' && info.linkUrl && isSubstackUrl(info.linkUrl)) {
       var linkUrl = info.linkUrl;
       
       saveArticle({

@@ -504,6 +504,8 @@ window.storage = {
             var comparison = 0;
             if (sortBy === 'title') {
               comparison = (a.title || '').localeCompare(b.title || '');
+            } else if (sortBy === 'author') {
+              comparison = (a.author || '').localeCompare(b.author || '');
             } else if (sortBy === 'progress') {
               comparison = a.progress - b.progress;
             } else {
@@ -579,18 +581,20 @@ window.storage = {
             });
           }
 
+          var existingArticle = articles[id];
+          
           articles[id] = {
             id: id,
             url: String(item.url),
-            title: self.sanitizeInput(item.title || 'Untitled'),
-            author: '',
-            thumbnail: '',
-            savedAt: Date.now(),
-            progress: 0,
-            tags: articleTags,
-            folder: null,
-            notes: self.sanitizeInput(item.notes || ''),
-            isFavorite: false
+            title: self.sanitizeInput(item.title || existingArticle?.title || 'Untitled'),
+            author: existingArticle?.author || '',
+            thumbnail: existingArticle?.thumbnail || '',
+            savedAt: existingArticle?.savedAt || Date.now(),
+            progress: existingArticle?.progress || 0,
+            tags: articleTags.length > 0 ? articleTags : (existingArticle?.tags || []),
+            folder: existingArticle?.folder || null,
+            notes: self.sanitizeInput(item.notes || existingArticle?.notes || ''),
+            isFavorite: existingArticle?.isFavorite || false
           };
         });
 
