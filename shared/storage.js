@@ -252,14 +252,18 @@ window.storage = {
     return updated;
   },
 
-  async getProgressFromLocal(url) {
-    const id = utils.hashCode(url);
-    const PROGRESS_KEY = `substacksaver_progress_${id}`;
+  async getAllProgressFromLocal() {
     try {
-      const result = await chrome.storage.local.get(PROGRESS_KEY);
-      return result[PROGRESS_KEY]?.progress || 0;
+      const all = await chrome.storage.local.get(null);
+      const progressData = {};
+      for (const [key, value] of Object.entries(all)) {
+        if (key.startsWith('substacksaver_progress_')) {
+          progressData[key.replace('substacksaver_progress_', '')] = value.progress;
+        }
+      }
+      return progressData;
     } catch (e) {
-      return 0;
+      return {};
     }
   },
 
@@ -268,10 +272,13 @@ window.storage = {
     const tags = await this.getTags();
     const folders = await this.getFolders();
     
+    const allProgress = await this.getAllProgressFromLocal();
+    
     let results = Object.values(articles);
     
     for (let article of results) {
-      const localProgress = await this.getProgressFromLocal(article.url);
+      const id = utils.hashCode(article.url);
+      const localProgress = allProgress[id] || 0;
       if (localProgress > article.progress) {
         article.progress = localProgress;
       }
@@ -346,26 +353,37 @@ window.storage = {
   },
 
   async importFromEdgeCollections(collectionData) {
+    if (!collectionData || typeof collectionData !== 'object') {
+      throw new Error('Invalid import data');
+    }
+    
+    const items = Array.isArray(collectionData.items) ? collectionData.items : [];
     const articles = await this.getArticles();
     const tags = await this.getTags();
-    const existingTagIds = Object.values(tags).map(t => t.name.toLowerCase());
     
-    for (const item of collectionData.items || []) {
+    for (const item of items) {
+      if (!item || typeof item !== 'object' || !item.url) {
+        continue;
+      }
+      
       const id = utils.hashCode(item.url);
       
       let articleTags = [];
-      for (const tagName of item.tags || []) {
-        const normalizedName = tagName.toLowerCase();
-        const existingTag = Object.values(tags).find(t => t.name.toLowerCase() === normalizedName);
-        if (existingTag) {
-          articleTags.push(existingTag.id);
+      if (Array.isArray(item.tags)) {
+        for (const tagName of item.tags) {
+          if (typeof tagName !== 'string') continue;
+          const normalizedName = tagName.toLowerCase();
+          const existingTag = Object.values(tags).find(t => t.name.toLowerCase() === normalizedName);
+          if (existingTag) {
+            articleTags.push(existingTag.id);
+          }
         }
       }
 
       articles[id] = {
         id,
-        url: item.url,
-        title: this.sanitizeInput(item.title),
+        url: String(item.url),
+        title: this.sanitizeInput(item.title || 'Untitled'),
         author: '',
         thumbnail: '',
         savedAt: Date.now(),
@@ -377,7 +395,11 @@ window.storage = {
       };
     }
 
-    await chrome.storage.sync.set({ [this.STORAGE_KEYS.ARTICLES]: articles });
+    try {
+      await chrome.storage.sync.set({ [this.STORAGE_KEYS.ARTICLES]: articles });
+    } catch (e) {
+      await chrome.storage.local.set({ [this.STORAGE_KEYS.ARTICLES]: articles });
+    }
   }
 };
 

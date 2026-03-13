@@ -12,11 +12,25 @@
   async function init() {
     settings = await storage.getSettings();
     utils.applyTheme(settings.theme || 'system');
+    currentView = settings.defaultView || 'grid';
     
     await loadData();
     setupEventListeners();
     renderArticles();
     updateCounts();
+    updateViewToggle();
+  }
+
+  function updateViewToggle() {
+    const gridBtn = document.getElementById('gridViewBtn');
+    const listBtn = document.getElementById('listViewBtn');
+    if (currentView === 'grid') {
+      gridBtn.classList.add('active');
+      listBtn.classList.remove('active');
+    } else {
+      listBtn.classList.add('active');
+      gridBtn.classList.remove('active');
+    }
   }
 
   async function loadData() {
@@ -59,6 +73,7 @@
       gridViewBtn.classList.add('active');
       listViewBtn.classList.remove('active');
       renderArticles();
+      storage.updateSettings({ defaultView: 'grid' });
     });
 
     listViewBtn.addEventListener('click', () => {
@@ -66,6 +81,7 @@
       listViewBtn.classList.add('active');
       gridViewBtn.classList.remove('active');
       renderArticles();
+      storage.updateSettings({ defaultView: 'list' });
     });
 
     document.querySelectorAll('.nav-item').forEach(item => {

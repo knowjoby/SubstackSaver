@@ -178,6 +178,8 @@
     document.getElementById('selectedFolder').textContent = folderText;
   }
 
+  let isSaving = false;
+
   function setupEventListeners() {
     const tagBtn = document.getElementById('tagDropdownBtn');
     const tagMenu = document.getElementById('tagDropdownMenu');
@@ -207,6 +209,44 @@
         tagMenu.classList.remove('open');
         folderMenu.classList.remove('open');
       }
+    });
+
+    saveBtn.addEventListener('click', async () => {
+      if (isSaving || !currentArticle) return;
+      
+      isSaving = true;
+      const isSaved = saveBtn.classList.contains('saved');
+      
+      if (isSaved) {
+        await storage.deleteArticle(currentArticle.url);
+        saveBtn.classList.remove('saved');
+        saveBtn.innerHTML = '<span class="btn-text">Save to Reading List</span>';
+        selectedTags = [];
+        selectedFolder = null;
+        renderSelectedTags();
+        renderSelectedFolder();
+      } else {
+        saveBtn.classList.add('loading');
+        
+        try {
+          await storage.saveArticle({
+            ...currentArticle,
+            tags: selectedTags,
+            folder: selectedFolder
+          });
+          
+          saveBtn.classList.remove('loading');
+          saveBtn.classList.add('saved');
+          saveBtn.innerHTML = '<span class="btn-text">✓ Saved</span>';
+        } catch (e) {
+          saveBtn.classList.remove('loading');
+          console.error('Failed to save:', e);
+        }
+      }
+      
+      isSaving = false;
+    });
+  }
     });
 
     tagMenu.addEventListener('click', async (e) => {

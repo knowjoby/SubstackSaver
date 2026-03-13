@@ -101,6 +101,17 @@ window.utils = {
     } else {
       root.setAttribute('data-theme', theme);
     }
+  },
+
+  initThemeListener() {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    mq.addEventListener('change', () => {
+      chrome.storage.sync.get(['settings'], (result) => {
+        if (result.settings?.theme === 'system') {
+          this.applyTheme('system');
+        }
+      });
+    });
   }
 };
 
