@@ -247,12 +247,30 @@ window.storage = {
     return updated;
   },
 
+  async getProgressFromLocal(url) {
+    const id = utils.hashCode(url);
+    const PROGRESS_KEY = `substacksaver_progress_${id}`;
+    try {
+      const result = await chrome.storage.local.get(PROGRESS_KEY);
+      return result[PROGRESS_KEY]?.progress || 0;
+    } catch (e) {
+      return 0;
+    }
+  },
+
   async searchArticles(query, filters = {}) {
     const articles = await this.getArticles();
     const tags = await this.getTags();
     const folders = await this.getFolders();
     
     let results = Object.values(articles);
+    
+    for (let article of results) {
+      const localProgress = await this.getProgressFromLocal(article.url);
+      if (localProgress > article.progress) {
+        article.progress = localProgress;
+      }
+    }
     
     if (query) {
       const q = query.toLowerCase();

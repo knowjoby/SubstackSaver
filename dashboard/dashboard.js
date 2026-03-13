@@ -123,6 +123,12 @@
       }
     });
 
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && settingsModal.classList.contains('open')) {
+        settingsModal.classList.remove('open');
+      }
+    });
+
     themeSelect.addEventListener('change', async (e) => {
       settings.theme = e.target.value;
       await storage.updateSettings({ theme: settings.theme });

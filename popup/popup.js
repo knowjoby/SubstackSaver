@@ -202,6 +202,13 @@
       folderMenu.classList.remove('open');
     });
 
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        tagMenu.classList.remove('open');
+        folderMenu.classList.remove('open');
+      }
+    });
+
     tagMenu.addEventListener('click', async (e) => {
       const tagOption = e.target.closest('.tag-option');
       if (tagOption) {
