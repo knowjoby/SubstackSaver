@@ -37,8 +37,6 @@
   }
 
   async function loadArticleInfo(tab) {
-
-  async function loadArticleInfo(tab) {
     try {
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
