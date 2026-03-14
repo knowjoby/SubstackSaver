@@ -76,11 +76,11 @@
     
     if (progressParam) {
       var progress = parseInt(progressParam, 10);
-      if (!isNaN(progress)) {
+      if (!isNaN(progress) && progress >= 0 && progress <= 100) {
         setTimeout(function() {
           scrollToProgress(progress);
           
-          var cleanUrl = window.location.href.replace(/[?&]progress=\d+/g, '').replace(/[?&]from=substacksaver/g, '');
+          var cleanUrl = window.location.href.split('?')[0];
           window.history.replaceState({}, document.title, cleanUrl);
         }, 500);
       }
@@ -142,9 +142,7 @@
             progress: progress,
             timestamp: Date.now()
           };
-          chrome.storage.local.set(data, function() {
-            // Saved
-          });
+          chrome.storage.local.set(data);
         } catch (e) {
           console.log('SubstackSaver: Could not save final progress', e);
         }

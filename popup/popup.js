@@ -52,9 +52,9 @@
           thumbnail: ogImage || ''
         };
       }
-    }, function(results, error) {
-      if (error) {
-        console.error('Script execution error:', error);
+    }, function(results) {
+      if (chrome.runtime.lastError) {
+        console.error('Script execution error:', chrome.runtime.lastError.message);
         document.getElementById('articleTitle').textContent = tab.title;
         if (callback) callback();
         return;
@@ -85,14 +85,21 @@
           if (existingArticle) {
             document.getElementById('saveBtn').innerHTML = '<span class="btn-text">✓ Saved</span>';
             document.getElementById('saveBtn').classList.add('saved');
-            
-            if (existingArticle.progress > 0) {
-              document.getElementById('progressSection').style.display = 'block';
-              document.getElementById('progressText').textContent = existingArticle.progress + '%';
-              document.getElementById('progressFill').style.width = existingArticle.progress + '%';
-            }
+
+            var localKey = 'substacksaver_progress_' + storage.hashCode(tab.url);
+            chrome.storage.local.get([localKey], function(localResult) {
+              var localProgress = (localResult[localKey] && localResult[localKey].progress) || 0;
+              var progress = Math.max(existingArticle.progress || 0, localProgress);
+              if (progress > 0) {
+                document.getElementById('progressSection').style.display = 'block';
+                document.getElementById('progressText').textContent = progress + '%';
+                document.getElementById('progressFill').style.width = progress + '%';
+              }
+              if (callback) callback();
+            });
+          } else {
+            if (callback) callback();
           }
-          if (callback) callback();
         });
       } catch (e) {
         console.error('Error loading article info:', e);

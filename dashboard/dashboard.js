@@ -51,7 +51,7 @@
   }
 
   function loadData(callback) {
-    storage.searchArticles('', { status: 'all', sortBy: sortBy, sortOrder: sortOrder }, function(results) {
+    storage.searchArticles('', { status: null, sortBy: sortBy, sortOrder: sortOrder }, function(results) {
       articles = results;
       storage.getTags(function(tags) {
         allTags = tags;
@@ -67,22 +67,51 @@
   function renderFolders() {
     var container = document.getElementById('foldersList');
     if (!container) return;
-    
+
     var folders = Object.values(allFolders).sort(function(a, b) { return a.order - b.order; });
-    
+
+    var addBtn = '<div style="padding: 4px 8px;">' +
+      '<button id="addFolderBtn" style="display:flex;align-items:center;gap:6px;width:100%;padding:6px 12px;border-radius:4px;font-size:12px;color:var(--text-secondary);background:none;border:none;cursor:pointer;transition:background 150ms ease-out;" onmouseover="this.style.background=\'var(--bg-tertiary)\'" onmouseout="this.style.background=\'none\'">' +
+      '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
+      'New Folder</button></div>';
+
     if (folders.length === 0) {
-      container.innerHTML = '<div style="padding: 12px; color: var(--text-secondary); font-size: 12px;">No folders yet</div>';
+      container.innerHTML = '<div style="padding: 12px; color: var(--text-secondary); font-size: 12px;">No folders yet</div>' + addBtn;
+      document.getElementById('addFolderBtn').addEventListener('click', promptAddFolder);
       return;
     }
-    
+
     container.innerHTML = folders.map(function(folder) {
       return '<div class="folder-item" data-folder="' + utils.escapeHtml(folder.id) + '">' +
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
         '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>' +
         '</svg>' +
-        '<span>' + utils.escapeHtml(folder.name) + '</span>' +
+        '<span style="flex:1">' + utils.escapeHtml(folder.name) + '</span>' +
+        '<div class="folder-actions">' +
+        '<button class="folder-action-btn" data-action="rename" data-folder="' + utils.escapeHtml(folder.id) + '" title="Rename">' +
+        '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>' +
+        '</button>' +
+        '<button class="folder-action-btn" data-action="delete" data-folder="' + utils.escapeHtml(folder.id) + '" title="Delete" style="color:var(--error)">' +
+        '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>' +
+        '</button>' +
+        '</div>' +
         '</div>';
-    }).join('');
+    }).join('') + addBtn;
+
+    document.getElementById('addFolderBtn').addEventListener('click', promptAddFolder);
+  }
+
+  function promptAddFolder() {
+    var name = prompt('Enter folder name:');
+    if (name && name.trim()) {
+      storage.createFolder(name.trim(), function() {
+        storage.getFolders(function(folders) {
+          allFolders = folders;
+          renderFolders();
+          showToast('Folder created', 'success');
+        });
+      });
+    }
   }
 
   function setupEventListeners() {
@@ -158,7 +187,8 @@
         
         if (folderItem) {
           navItems.forEach(function(i) { i.classList.remove('active'); });
-          folderItems.forEach(function(f) { f.classList.remove('active'); });
+          var currentFolderItems = document.querySelectorAll('.folder-item');
+          currentFolderItems.forEach(function(f) { f.classList.remove('active'); });
           folderItem.classList.add('active');
           
           currentFolder = folderItem.dataset.folder;
@@ -575,6 +605,7 @@
   }
 
   function selectAllArticles() {
+    selectedArticles = [];
     var cards = document.querySelectorAll('.article-card');
     cards.forEach(function(card) {
       var url = decodeURIComponent(card.dataset.url);

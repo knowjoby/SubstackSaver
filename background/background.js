@@ -165,15 +165,13 @@ function initializeStorage() {
 }
 
 function createContextMenus() {
-  if (chrome.contextMenus) {
-    chrome.contextMenus.removeAll();
-  }
+  if (!chrome.contextMenus) return;
 
-  if (chrome.contextMenus) {
+  chrome.contextMenus.removeAll(function() {
     chrome.contextMenus.create({
       id: 'saveToSubstackSaver',
       title: 'Save to SubstackSaver',
-      contexts: ['page', 'link'],
+      contexts: ['page'],
       documentUrlPatterns: ['*://*.substack.com/*']
     });
 
@@ -183,7 +181,7 @@ function createContextMenus() {
       contexts: ['link'],
       documentUrlPatterns: ['*://*.substack.com/*']
     });
-  }
+  });
 }
 
 if (chrome.runtime && chrome.runtime.onInstalled) {
@@ -235,9 +233,9 @@ if (chrome.contextMenus && chrome.contextMenus.onClicked) {
             thumbnail: ogImage || ''
           };
         }
-      }, function(results, error) {
-        if (error) {
-          console.error('Script execution error:', error);
+      }, function(results) {
+        if (chrome.runtime.lastError) {
+          console.error('Script execution error:', chrome.runtime.lastError.message);
           return;
         }
         
@@ -257,11 +255,11 @@ if (chrome.contextMenus && chrome.contextMenus.onClicked) {
     }
 
     if (info.menuItemId === 'saveLinkToSubstackSaver' && info.linkUrl && isSubstackUrl(info.linkUrl)) {
-      var linkUrl = info.linkUrl;
-      
+      var savedLinkUrl = info.linkUrl;
+
       saveArticle({
-        url: linkUrl,
-        title: linkUrl.split('/').pop() || 'Substack Article',
+        url: savedLinkUrl,
+        title: savedLinkUrl.split('/').pop() || 'Substack Article',
         author: '',
         thumbnail: ''
       }, function() {});
