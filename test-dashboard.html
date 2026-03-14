@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SubstackSaver - Reading List (TEST)</title>
+  <link rel="stylesheet" href="shared/styles/fluent.css">
+
+  <!-- ===== Chrome API Mock ===== -->
+  <script>
+    (function() {
+      var mockData = {
+        articles: {
+          'abc123': { id: 'abc123', url: 'https://test.substack.com/p/future-of-ai', title: 'The Future of Artificial Intelligence in 2025', author: 'Jane Smith', thumbnail: '', savedAt: Date.now() - 3600000, progress: 65, tags: ['read', 'important'], folder: null, notes: '', isFavorite: true },
+          'def456': { id: 'def456', url: 'https://test.substack.com/p/web-dev-trends', title: 'Web Development Trends Worth Watching', author: 'Bob Johnson', thumbnail: '', savedAt: Date.now() - 86400000, progress: 0, tags: ['later'], folder: null, notes: '', isFavorite: false },
+          'ghi789': { id: 'ghi789', url: 'https://test.substack.com/p/productivity-hacks', title: 'Productivity Hacks for Deep Work Sessions', author: 'Alice Brown', thumbnail: '', savedAt: Date.now() - 172800000, progress: 100, tags: ['read'], folder: 'f1', notes: '', isFavorite: false },
+          'jkl012': { id: 'jkl012', url: 'https://test.substack.com/p/startup-lessons', title: 'Startup Lessons Nobody Tells You About', author: 'Carlos Mendez', thumbnail: '', savedAt: Date.now() - 259200000, progress: 30, tags: ['important', 'later'], folder: 'f1', notes: '', isFavorite: true }
+        },
+        tags: {
+          'read':      { id: 'read',      name: 'Read',        color: '#107C10' },
+          'later':     { id: 'later',     name: 'Read Later',  color: '#0078D4' },
+          'important': { id: 'important', name: 'Important',   color: '#D13438' }
+        },
+        folders: {
+          'f1': { id: 'f1', name: 'Deep Work', order: 0 },
+          'f2': { id: 'f2', name: 'Tech',       order: 1 }
+        },
+        settings: { theme: 'system', defaultView: 'grid', showProgress: true }
+      };
+
+      window.chrome = {
+        runtime: { lastError: null },
+        storage: {
+          sync: {
+            get: function(keys, cb) {
+              var result = {};
+              if (keys === null) { Object.assign(result, mockData); cb(result); return; }
+              var ks = typeof keys === 'string' ? [keys] : (Array.isArray(keys) ? keys : Object.keys(keys));
+              ks.forEach(function(k) { if (mockData[k] !== undefined) result[k] = mockData[k]; });
+              cb(result);
+            },
+            set: function(data, cb) { Object.keys(data).forEach(function(k){ mockData[k] = data[k]; }); if (cb) cb(); }
+          },
+          local: {
+            get: function(keys, cb) {
+              // Simulate saved scroll progress for first article
+              var r = {};
+              var ks = Array.isArray(keys) ? keys : (keys ? [keys] : []);
+              ks.forEach(function(k) {
+                if (k === 'substacksaver_progress_abc123_key') r[k] = { progress: 72 };
+              });
+              cb(r);
+            },
+            set: function(data, cb) { if (cb) cb(); }
+          }
+        },
+        tabs: { query: function(q, cb) { cb([]); } }
+      };
+    })();
+  </script>
+</head>
+<!-- Inline the dashboard body content directly -->
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span>SubstackSaver</span>
+      </div>
+    </div>
+
+    <nav class="nav-section">
+      <div class="nav-label">Library</div>
+      <div class="nav-item active" data-filter="all">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span>All Articles</span>
+        <span class="nav-count" id="countAll">0</span>
+      </div>
+      <div class="nav-item" data-filter="favorites">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        </svg>
+        <span>Favorites</span>
+        <span class="nav-count" id="countFavorites">0</span>
+      </div>
+    </nav>
+
+    <div class="folder-tree" id="foldersList"></div>
+
+    <div class="sidebar-footer">
+      <button class="settings-btn" id="settingsBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        <span>Settings</span>
+      </button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="main-header">
+      <div class="header-top">
+        <h1 class="page-title" id="pageTitle">All Articles</h1>
+        <div class="header-actions">
+          <div class="view-toggle">
+            <button class="active" id="gridViewBtn" title="Grid view">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+              </svg>
+            </button>
+            <button id="listViewBtn" title="List view">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+                <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
+                <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="search-bar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" class="input" id="searchInput" placeholder="Search by title, author, or tag...">
+      </div>
+    </header>
+
+    <div class="filter-bar">
+      <div class="filter-pills">
+        <button class="filter-pill active" data-status="all">All</button>
+        <button class="filter-pill" data-status="unread">Unread</button>
+        <button class="filter-pill" data-status="in-progress">In Progress</button>
+        <button class="filter-pill" data-status="completed">Completed</button>
+      </div>
+      <div class="filter-dropdown">
+        <button class="filter-dropdown-btn" id="sortBtn">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="8" y2="18"/>
+          </svg>
+          <span id="sortLabel">Sort: Date</span>
+        </button>
+        <div class="filter-dropdown-menu" id="sortMenu">
+          <div class="dropdown-item active" data-sort="savedAt" data-order="desc"><span>Newest First</span></div>
+          <div class="dropdown-item" data-sort="savedAt" data-order="asc"><span>Oldest First</span></div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item" data-sort="title" data-order="asc"><span>Title A-Z</span></div>
+          <div class="dropdown-item" data-sort="title" data-order="desc"><span>Title Z-A</span></div>
+        </div>
+      </div>
+      <div class="offline-indicator" id="offlineIndicator">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="1" y1="1" x2="23" y2="23"/>
+        </svg>
+        <span>Offline</span>
+      </div>
+      <button class="manage-tags-btn" id="manageTagsBtn">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+          <line x1="7" y1="7" x2="7.01" y2="7"/>
+        </svg>
+        Tags
+      </button>
+      <div class="export-menu">
+        <button class="filter-dropdown-btn" id="exportBtn">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Export
+        </button>
+        <div class="export-dropdown" id="exportDropdown">
+          <div class="export-option" data-format="json"><span>JSON</span></div>
+          <div class="export-option" data-format="html"><span>HTML</span></div>
+          <div class="export-option" data-format="markdown"><span>Markdown</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bulk-actions" id="bulkActions">
+      <span class="selected-count"><span id="selectedCount">0</span> selected</span>
+      <button class="bulk-btn" id="bulkTagBtn">Add Tags</button>
+      <button class="bulk-btn" id="bulkFolderBtn">Move to Folder</button>
+      <button class="bulk-btn danger" id="bulkDeleteBtn">Delete</button>
+      <button class="close-bulk" id="closeBulk">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div id="articlesContainer">
+      <div class="article-grid" id="articlesGrid"></div>
+    </div>
+  </main>
+
+  <!-- Modals (same as dashboard.html) -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Settings</h3>
+        <button class="btn-icon" id="closeSettings">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="settings-section">
+          <h3>Appearance</h3>
+          <div class="settings-row">
+            <div><div class="settings-label">Theme</div></div>
+            <select class="input" id="themeSelect">
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </div>
+        </div>
+        <div class="settings-section">
+          <h3>Data</h3>
+          <div class="settings-row">
+            <div><div class="settings-label">Export to Edge Collections</div></div>
+            <button class="btn btn-secondary" id="exportEdgeBtn">Export</button>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-label">Import from Edge Collections</div></div>
+            <button class="btn btn-secondary" id="importEdgeBtn">Import</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-overlay" id="tagModal">
+    <div class="modal">
+      <div class="modal-header"><h3>Manage Tags</h3><button class="btn-icon" id="closeTagModal">✕</button></div>
+      <div class="modal-body" id="tagModalBody"></div>
+    </div>
+  </div>
+  <div class="modal-overlay" id="folderModal">
+    <div class="modal">
+      <div class="modal-header"><h3>Manage Folders</h3><button class="btn-icon" id="closeFolderModal">✕</button></div>
+      <div class="modal-body" id="folderModalBody"></div>
+    </div>
+  </div>
+  <div class="modal-overlay" id="bulkTagModal">
+    <div class="modal">
+      <div class="modal-header"><h3>Add Tags to Selected</h3><button class="btn-icon" id="closeBulkTagModal">✕</button></div>
+      <div class="modal-body"><div id="bulkTagList"></div></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancelBulkTag">Cancel</button>
+        <button class="btn btn-primary" id="applyBulkTag">Apply</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-overlay" id="bulkFolderModal">
+    <div class="modal">
+      <div class="modal-header"><h3>Move to Folder</h3><button class="btn-icon" id="closeBulkFolderModal">✕</button></div>
+      <div class="modal-body"><div id="bulkFolderList"></div></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancelBulkFolder">Cancel</button>
+        <button class="btn btn-primary" id="applyBulkFolder">Move</button>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="importFile" accept=".json" style="display: none;">
+  <div class="toast-container" id="toastContainer"></div>
+  <div class="article-preview-tooltip" id="previewTooltip">
+    <div class="preview-title" id="previewTitle"></div>
+    <div class="preview-author" id="previewAuthor"></div>
+    <div class="preview-excerpt" id="previewExcerpt"></div>
+    <div class="preview-meta">
+      <span class="reading-time" id="previewReadingTime"></span>
+      <span class="article-card-date" id="previewDate"></span>
+    </div>
+  </div>
+
+  <style>
+    :root { --sidebar-width: 240px; }
+    * { box-sizing: border-box; }
+    body { display: flex; min-height: 100vh; }
+    .sidebar { width: var(--sidebar-width); background: var(--bg-secondary); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 10; }
+    .sidebar-header { padding: var(--space-lg); border-bottom: 1px solid var(--border); }
+    .logo { display: flex; align-items: center; gap: var(--space-sm); font-weight: 600; font-size: 16px; }
+    .logo svg { width: 24px; height: 24px; color: var(--accent); }
+    .nav-section { padding: var(--space-md); }
+    .nav-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); padding: var(--space-sm) var(--space-md); margin-bottom: var(--space-xs); }
+    .nav-item { display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-sm) var(--space-md); border-radius: var(--radius-sm); color: var(--text-primary); cursor: pointer; transition: background var(--transition-fast); }
+    .nav-item:hover { background: var(--bg-tertiary); }
+    .nav-item.active { background: var(--accent); color: white; }
+    .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .nav-item span { flex: 1; font-size: 13px; }
+    .nav-count { font-size: 11px; color: var(--text-secondary); background: var(--bg-tertiary); padding: 2px 6px; border-radius: 100px; }
+    .nav-item.active .nav-count { background: rgba(255,255,255,0.2); color: white; }
+    .folder-tree { flex: 1; overflow-y: auto; padding: var(--space-sm); }
+    .folder-item { display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-sm) var(--space-md); border-radius: var(--radius-sm); cursor: pointer; transition: background var(--transition-fast); }
+    .folder-item:hover { background: var(--bg-tertiary); }
+    .folder-item.active { background: var(--bg-tertiary); }
+    .folder-item svg { width: 14px; height: 14px; color: var(--text-secondary); }
+    .sidebar-footer { padding: var(--space-sm); border-top: 1px solid var(--border); display: flex; justify-content: center; }
+    .settings-btn { display: flex; align-items: center; justify-content: center; gap: var(--space-xs); width: 32px; height: 32px; padding: 0; border-radius: var(--radius-sm); color: var(--text-secondary); transition: all var(--transition-fast); }
+    .settings-btn svg { width: 16px; height: 16px; }
+    .settings-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+    .settings-btn span { display: none; }
+    .main-content { flex: 1; margin-left: var(--sidebar-width); min-height: 100vh; }
+    .main-header { position: sticky; top: 0; background: var(--bg-primary); border-bottom: 1px solid var(--border); padding: var(--space-lg) var(--space-xl); z-index: 5; }
+    .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-md); }
+    .page-title { font-size: 24px; font-weight: 600; }
+    .header-actions { display: flex; align-items: center; gap: var(--space-sm); }
+    .view-toggle { display: flex; background: var(--bg-secondary); border-radius: var(--radius-sm); padding: 2px; }
+    .view-toggle button { padding: var(--space-xs) var(--space-sm); border-radius: var(--radius-sm); color: var(--text-secondary); transition: all var(--transition-fast); }
+    .view-toggle button.active { background: var(--bg-primary); color: var(--text-primary); box-shadow: var(--shadow-card); }
+    .search-bar { position: relative; max-width: 400px; }
+    .search-bar svg { position: absolute; left: var(--space-md); top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-secondary); }
+    .search-bar input { width: 100%; padding-left: 40px; }
+    .search-bar input:focus { outline: none; border-color: var(--accent); }
+    .filter-bar { display: flex; align-items: center; gap: var(--space-md); padding: var(--space-md) var(--space-xl); background: var(--bg-secondary); border-bottom: 1px solid var(--border); }
+    .filter-pills { display: flex; gap: var(--space-xs); }
+    .filter-pill { padding: var(--space-xs) var(--space-md); border-radius: 100px; font-size: 12px; background: var(--bg-tertiary); color: var(--text-secondary); transition: all var(--transition-fast); cursor: pointer; }
+    .filter-pill:hover { background: var(--border); }
+    .filter-pill.active { background: var(--accent); color: white; }
+    .filter-dropdown { position: relative; }
+    .filter-dropdown-btn { display: flex; align-items: center; gap: var(--space-xs); padding: var(--space-xs) var(--space-md); border-radius: var(--radius-sm); font-size: 12px; color: var(--text-secondary); background: var(--bg-tertiary); }
+    .filter-dropdown-menu { display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 160px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-elevated); z-index: 100; }
+    .filter-dropdown-menu.open { display: block; }
+    .dropdown-item { display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-sm) var(--space-md); color: var(--text-primary); cursor: pointer; transition: background var(--transition-fast); }
+    .dropdown-item:hover { background: var(--bg-secondary); }
+    .dropdown-item.active { background: var(--bg-tertiary); }
+    .dropdown-divider { height: 1px; background: var(--border); margin: var(--space-xs) 0; }
+    .article-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-lg); padding: var(--space-xl); }
+    .article-list { display: flex; flex-direction: column; gap: var(--space-md); padding: var(--space-xl); }
+    .article-card { display: flex; gap: var(--space-md); padding: var(--space-md); background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s ease; position: relative; }
+    .article-card.selected { border-color: var(--accent); background: var(--bg-secondary); }
+    .article-card:hover { border-color: var(--accent); box-shadow: 0 4px 12px rgba(0,0,0,0.1); transform: translateY(-2px); }
+    .article-card .thumbnail { width: 120px; height: 68px; border-radius: var(--radius-sm); object-fit: cover; background: var(--bg-secondary); flex-shrink: 0; }
+    .article-card.list-view .thumbnail { width: 160px; height: 90px; }
+    .article-checkbox { position: absolute; top: var(--space-md); left: var(--space-md); width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; opacity: 0; transition: opacity var(--transition-fast); }
+    .article-card:hover .article-checkbox, .article-card.selected .article-checkbox { opacity: 1; }
+    .article-card-content { flex: 1; min-width: 0; }
+    .article-card-title { font-weight: 600; font-size: 14px; line-height: 1.4; margin-bottom: var(--space-xs); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .article-card-author { font-size: 12px; color: var(--text-secondary); margin-bottom: var(--space-sm); }
+    .article-card-meta { display: flex; align-items: center; gap: var(--space-sm); }
+    .article-card-meta-left { display: flex; align-items: center; gap: var(--space-sm); flex: 1; }
+    .article-card-tags { display: flex; gap: var(--space-xs); }
+    .reading-time { font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; }
+    .reading-time svg { width: 12px; height: 12px; }
+    .article-card-date { font-size: 11px; color: var(--text-secondary); margin-left: auto; }
+    .article-card-progress { margin-top: var(--space-sm); }
+    .article-card .progress-bar { height: 3px; }
+    .article-card-actions { display: flex; gap: var(--space-xs); opacity: 0; transition: opacity var(--transition-fast); }
+    .article-card:hover .article-card-actions { opacity: 1; }
+    .action-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); color: var(--text-secondary); transition: all var(--transition-fast); }
+    .action-btn:hover { background: var(--bg-secondary); color: var(--text-primary); }
+    .action-btn.delete:hover { color: var(--error); }
+    .action-btn.selected { color: var(--accent); }
+    .empty-state { grid-column: 1 / -1; padding: var(--space-xxl); text-align: center; }
+    .empty-state svg { width: 80px; height: 80px; color: var(--text-secondary); opacity: 0.3; margin-bottom: var(--space-lg); }
+    .empty-state h2 { font-size: 20px; margin-bottom: var(--space-sm); }
+    .empty-state p { color: var(--text-secondary); margin-bottom: var(--space-lg); }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 1000; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: var(--bg-primary); border-radius: var(--radius-lg); box-shadow: var(--shadow-elevated); width: 100%; max-width: 480px; max-height: 80vh; overflow: hidden; }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: var(--space-lg); border-bottom: 1px solid var(--border); }
+    .modal-header h3 { font-size: 16px; font-weight: 600; }
+    .modal-body { padding: var(--space-lg); overflow-y: auto; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: var(--space-sm); padding: var(--space-lg); border-top: 1px solid var(--border); }
+    .form-group { margin-bottom: var(--space-lg); }
+    .form-group label { display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: var(--space-xs); }
+    .tag-list { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+    .tag-item { display: inline-flex; align-items: center; gap: var(--space-xs); padding: var(--space-xs) var(--space-sm); border-radius: 100px; font-size: 12px; background: var(--bg-secondary); cursor: pointer; }
+    .tag-item:hover { background: var(--bg-tertiary); }
+    .tag-item.selected { background: var(--accent); color: white; }
+    .settings-section { margin-bottom: var(--space-xl); }
+    .settings-section h3 { font-size: 14px; font-weight: 600; margin-bottom: var(--space-md); }
+    .settings-row { display: flex; align-items: center; justify-content: space-between; padding: var(--space-md) 0; border-bottom: 1px solid var(--border); }
+    .settings-row:last-child { border-bottom: none; }
+    .settings-label { font-size: 13px; }
+    select.input { width: auto; padding-right: var(--space-xl); }
+    .bulk-actions { display: none; align-items: center; gap: var(--space-md); padding: var(--space-md) var(--space-xl); background: var(--accent); color: white; position: sticky; top: 0; z-index: 4; }
+    .bulk-actions.visible { display: flex; }
+    .bulk-actions .selected-count { font-weight: 600; }
+    .bulk-actions .bulk-btn { display: flex; align-items: center; gap: var(--space-xs); padding: var(--space-xs) var(--space-md); background: rgba(255,255,255,0.2); border-radius: var(--radius-sm); color: white; font-size: 12px; }
+    .bulk-actions .bulk-btn:hover { background: rgba(255,255,255,0.3); }
+    .bulk-actions .bulk-btn.danger { background: var(--error); }
+    .bulk-actions .close-bulk { margin-left: auto; color: white; opacity: 0.8; }
+    .toast-container { position: fixed; bottom: var(--space-xl); right: var(--space-xl); z-index: 2000; display: flex; flex-direction: column; gap: var(--space-sm); }
+    .toast { display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-md) var(--space-lg); background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-elevated); animation: slideIn 0.3s ease; max-width: 320px; }
+    .toast.success { border-left: 3px solid var(--success); }
+    .toast.error { border-left: 3px solid var(--error); }
+    .toast.info { border-left: 3px solid var(--accent); }
+    .toast svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .toast.success svg { color: var(--success); }
+    .toast.error svg { color: var(--error); }
+    .toast-message { flex: 1; font-size: 13px; }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+    .article-preview-tooltip { position: fixed; z-index: 1000; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-elevated); padding: var(--space-md); max-width: 300px; pointer-events: none; opacity: 0; transition: opacity var(--transition-fast); }
+    .article-preview-tooltip.visible { opacity: 1; }
+    .preview-title { font-weight: 600; font-size: 13px; margin-bottom: var(--space-xs); }
+    .preview-author { font-size: 12px; color: var(--text-secondary); margin-bottom: var(--space-sm); }
+    .export-menu { position: relative; }
+    .export-dropdown { display: none; position: absolute; top: calc(100% + 4px); right: 0; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-elevated); z-index: 100; min-width: 140px; }
+    .export-dropdown.open { display: block; }
+    .export-option { display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-sm) var(--space-md); cursor: pointer; font-size: 13px; transition: background var(--transition-fast); }
+    .export-option:hover { background: var(--bg-secondary); }
+    .manage-tags-btn { display: flex; align-items: center; gap: var(--space-xs); padding: var(--space-xs) var(--space-md); color: var(--text-secondary); font-size: 12px; }
+    .manage-tags-btn:hover { color: var(--accent); }
+    .folder-actions { display: flex; gap: var(--space-xs); opacity: 0; transition: opacity var(--transition-fast); }
+    .folder-item:hover .folder-actions { opacity: 1; }
+    .folder-action-btn { padding: 2px; color: var(--text-secondary); border-radius: var(--radius-sm); }
+    .folder-action-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+    .tag-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 100px; font-size: 11px; background: var(--bg-secondary); }
+    .tag-chip .tag-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .color-picker-row { display: flex; gap: var(--space-xs); margin-top: var(--space-sm); }
+    .color-option { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform var(--transition-fast); }
+    .color-option:hover { transform: scale(1.1); }
+    .color-option.selected { border-color: var(--text-primary); }
+    .offline-indicator { display: none; align-items: center; gap: var(--space-xs); padding: var(--space-xs) var(--space-sm); background: var(--warning); color: #000; font-size: 11px; border-radius: var(--radius-sm); }
+    .offline-indicator.visible { display: flex; }
+  </style>
+
+  <script src="shared/utils.js"></script>
+  <script src="shared/storage.js"></script>
+  <script src="dashboard/dashboard.js"></script>
+</body>
+</html>

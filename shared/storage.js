@@ -469,7 +469,13 @@ window.storage = {
             results = results.filter(function(article) {
               var titleMatch = article.title && article.title.toLowerCase().indexOf(q) !== -1;
               var authorMatch = article.author && article.author.toLowerCase().indexOf(q) !== -1;
-              return titleMatch || authorMatch;
+              var tagMatch = false;
+              if (article.tags && article.tags.length > 0) {
+                tagMatch = article.tags.some(function(tagId) {
+                  return tags[tagId] && tags[tagId].name && tags[tagId].name.toLowerCase().indexOf(q) !== -1;
+                });
+              }
+              return titleMatch || authorMatch || tagMatch;
             });
           }
 
@@ -586,15 +592,15 @@ window.storage = {
           articles[id] = {
             id: id,
             url: String(item.url),
-            title: self.sanitizeInput(item.title || existingArticle?.title || 'Untitled'),
-            author: existingArticle?.author || '',
-            thumbnail: existingArticle?.thumbnail || '',
-            savedAt: existingArticle?.savedAt || Date.now(),
-            progress: existingArticle?.progress || 0,
-            tags: articleTags.length > 0 ? articleTags : (existingArticle?.tags || []),
-            folder: existingArticle?.folder || null,
-            notes: self.sanitizeInput(item.notes || existingArticle?.notes || ''),
-            isFavorite: existingArticle?.isFavorite || false
+            title: self.sanitizeInput(item.title || (existingArticle && existingArticle.title) || 'Untitled'),
+            author: (existingArticle && existingArticle.author) || '',
+            thumbnail: (existingArticle && existingArticle.thumbnail) || '',
+            savedAt: (existingArticle && existingArticle.savedAt) || Date.now(),
+            progress: (existingArticle && existingArticle.progress) || 0,
+            tags: articleTags.length > 0 ? articleTags : ((existingArticle && existingArticle.tags) || []),
+            folder: (existingArticle && existingArticle.folder) || null,
+            notes: self.sanitizeInput(item.notes || (existingArticle && existingArticle.notes) || ''),
+            isFavorite: (existingArticle && existingArticle.isFavorite) || false
           };
         });
 
