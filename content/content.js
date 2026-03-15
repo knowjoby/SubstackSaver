@@ -117,7 +117,7 @@
     
     window.addEventListener('scroll', function() {
       if (!ticking) {
-        var self = this;
+        ticking = true;
         requestAnimationFrame(function() {
           var progress = calculateProgress();
           
@@ -128,7 +128,6 @@
           
           ticking = false;
         });
-        ticking = true;
       }
     });
 

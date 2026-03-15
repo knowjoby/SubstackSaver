@@ -267,20 +267,24 @@ if (chrome.contextMenus && chrome.contextMenus.onClicked) {
   });
 }
 
+var toolbarClickHandler = function(tab) {
+  if (tab && tab.url && tab.url.indexOf('dashboard.html') !== -1) return;
+  
+  var dashboardUrl = '';
+  if (chrome.runtime && chrome.runtime.getURL) {
+    dashboardUrl = chrome.runtime.getURL('dashboard/dashboard.html');
+  }
+  if (tab && tab.id) {
+    chrome.tabs.create({ url: dashboardUrl, index: tab.index + 1 });
+  } else {
+    chrome.tabs.create({ url: dashboardUrl });
+  }
+};
+
 if (chrome.action && chrome.action.onClicked) {
-  chrome.action.onClicked.addListener(function(tab) {
-    if (tab && tab.url && tab.url.indexOf('dashboard.html') !== -1) return;
-    
-    var dashboardUrl = '';
-    if (chrome.runtime && chrome.runtime.getURL) {
-      dashboardUrl = chrome.runtime.getURL('dashboard/dashboard.html');
-    }
-    if (tab && tab.id) {
-      chrome.tabs.create({ url: dashboardUrl, index: tab.index + 1 });
-    } else {
-      chrome.tabs.create({ url: dashboardUrl });
-    }
-  });
+  chrome.action.onClicked.addListener(toolbarClickHandler);
+} else if (chrome.browserAction && chrome.browserAction.onClicked) {
+  chrome.browserAction.onClicked.addListener(toolbarClickHandler);
 }
 
 console.log('SubstackSaver: Background script loaded');

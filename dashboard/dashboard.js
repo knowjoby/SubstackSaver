@@ -1,4 +1,16 @@
 (function() {
+  function getValues(obj) {
+    return Object.keys(obj).map(function(key) { return obj[key]; });
+  }
+
+  function closestElement(element, selector) {
+    while (element && element !== document) {
+      if (element.matches && element.matches(selector)) return element;
+      element = element.parentElement;
+    }
+    return null;
+  }
+
   var currentFilter = 'all';
   var currentStatus = 'all';
   var currentFolder = null;
@@ -33,6 +45,7 @@
         renderArticles();
         updateCounts();
         updateViewToggle();
+        updateSortLabel();
         updateOfflineStatus();
       });
     });
@@ -68,12 +81,13 @@
     var container = document.getElementById('foldersList');
     if (!container) return;
 
-    var folders = Object.values(allFolders).sort(function(a, b) { return a.order - b.order; });
+    var folders = getValues(allFolders).sort(function(a, b) { return a.order - b.order; });
 
     var addBtn = '<div style="padding: 4px 8px;">' +
       '<button id="addFolderBtn" style="display:flex;align-items:center;gap:6px;width:100%;padding:6px 12px;border-radius:4px;font-size:12px;color:var(--text-secondary);background:none;border:none;cursor:pointer;transition:background 150ms ease-out;" onmouseover="this.style.background=\'var(--bg-tertiary)\'" onmouseout="this.style.background=\'none\'">' +
       '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
       'New Folder</button></div>';
+
 
     if (folders.length === 0) {
       container.innerHTML = '<div style="padding: 12px; color: var(--text-secondary); font-size: 12px;">No folders yet</div>' + addBtn;
@@ -169,8 +183,8 @@
     var foldersList = document.getElementById('foldersList');
     if (foldersList) {
       foldersList.addEventListener('click', function(e) {
-        var folderItem = e.target.closest('.folder-item');
-        var folderAction = e.target.closest('.folder-action-btn');
+        var folderItem = closestElement(e.target, '.folder-item');
+        var folderAction = closestElement(e.target, '.folder-action-btn');
         
         if (folderAction) {
           e.stopPropagation();
@@ -225,7 +239,7 @@
       });
 
       sortMenu.addEventListener('click', function(e) {
-        var item = e.target.closest('.dropdown-item');
+        var item = closestElement(e.target, '.dropdown-item');
         if (item) {
           sortBy = item.dataset.sort;
           sortOrder = item.dataset.order;
@@ -250,7 +264,7 @@
       });
 
       exportDropdown.addEventListener('click', function(e) {
-        var option = e.target.closest('.export-option');
+        var option = closestElement(e.target, '.export-option');
         if (option) {
           var format = option.dataset.format;
           exportArticles(format);
@@ -658,7 +672,7 @@
     var container = document.getElementById('bulkTagList');
     if (!container) return;
     
-    var tags = Object.values(allTags);
+    var tags = getValues(allTags);
     
     container.innerHTML = tags.map(function(tag) {
       return '<label class="checkbox" style="display: flex; margin-bottom: var(--space-sm);">' +
@@ -673,7 +687,7 @@
     var container = document.getElementById('bulkFolderList');
     if (!container) return;
     
-    var folders = Object.values(allFolders).sort(function(a, b) { return a.order - b.order; });
+    var folders = getValues(allFolders).sort(function(a, b) { return a.order - b.order; });
     
     var html = '<label class="checkbox" style="display: flex; margin-bottom: var(--space-sm);">' +
       '<input type="radio" name="folder" data-folder-id="" checked>' +
@@ -697,7 +711,7 @@
     var container = document.getElementById('tagModalBody');
     if (!container) return;
     
-    var tags = Object.values(allTags);
+    var tags = getValues(allTags);
     
     var colorOptionsHtml = TAG_COLORS.map(function(color, idx) {
       return '<div class="color-option' + (idx === 0 ? ' selected' : '') + '" data-color="' + color + '" style="background: ' + color + ';"></div>';
@@ -731,7 +745,7 @@
 
     var colorPicker = document.getElementById('colorPicker');
     colorPicker.addEventListener('click', function(e) {
-      var option = e.target.closest('.color-option');
+      var option = closestElement(e.target, '.color-option');
       if (option) {
         var opts = colorPicker.querySelectorAll('.color-option');
         opts.forEach(function(o) { o.classList.remove('selected'); });
@@ -763,8 +777,8 @@
     var existingTagsList = document.getElementById('existingTagsList');
     if (existingTagsList) {
       existingTagsList.addEventListener('click', function(e) {
-        var editBtn = e.target.closest('[data-action="edit"]');
-        var deleteBtn = e.target.closest('[data-action="delete"]');
+        var editBtn = closestElement(e.target, '[data-action="edit"]');
+        var deleteBtn = closestElement(e.target, '[data-action="delete"]');
         
         if (editBtn) {
           var tagId = editBtn.dataset.tag;
@@ -1105,7 +1119,7 @@
         });
 
         card.addEventListener('click', function(e) {
-          if (e.target.closest('.action-btn') || e.target.closest('.article-checkbox')) return;
+          if (closestElement(e.target, '.action-btn') || closestElement(e.target, '.article-checkbox')) return;
           
           var url = decodeURIComponent(card.dataset.url);
           var article = articles.find(function(a) { return a.url === url; });
@@ -1169,13 +1183,21 @@
 
   function showPreviewTooltip(e, article) {
     var tooltip = document.getElementById('previewTooltip');
+    if (!tooltip) return;
+    
     var readingTime = calculateReadingTime(article.title);
     
-    document.getElementById('previewTitle').textContent = article.title;
-    document.getElementById('previewAuthor').textContent = 'by ' + (article.author || 'Unknown');
-    document.getElementById('previewExcerpt').textContent = article.excerpt || 'No preview available';
-    document.getElementById('previewReadingTime').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> ' + readingTime;
-    document.getElementById('previewDate').textContent = utils.formatDate(article.savedAt);
+    var previewTitle = document.getElementById('previewTitle');
+    var previewAuthor = document.getElementById('previewAuthor');
+    var previewExcerpt = document.getElementById('previewExcerpt');
+    var previewReadingTime = document.getElementById('previewReadingTime');
+    var previewDate = document.getElementById('previewDate');
+    
+    if (previewTitle) previewTitle.textContent = article.title;
+    if (previewAuthor) previewAuthor.textContent = 'by ' + (article.author || 'Unknown');
+    if (previewExcerpt) previewExcerpt.textContent = article.excerpt || 'No preview available';
+    if (previewReadingTime) previewReadingTime.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> ' + readingTime;
+    if (previewDate) previewDate.textContent = utils.formatDate(article.savedAt);
     
     var rect = e.currentTarget.getBoundingClientRect();
     var left = rect.right + 10;
@@ -1204,7 +1226,7 @@
       var allCount = Object.keys(allArticles).length;
       
       var favCount = 0;
-      Object.values(allArticles).forEach(function(a) {
+      getValues(allArticles).forEach(function(a) {
         if (a.isFavorite) favCount++;
       });
       
